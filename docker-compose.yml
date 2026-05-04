@@ -1,0 +1,39 @@
+version: '3.8'
+services:
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - REACT_APP_API_URL=http://localhost:8080
+
+  gateway:
+    build: ./gateway
+    ports:
+      - "8080:8080"
+    environment:
+      - PORT=8080
+    depends_on:
+      - service-template
+
+  service-template:
+    build: ./Services/service-template
+    environment:
+      - PORT=5000
+      - DATABASE_URL=postgres://postgres:postgres@service_template_db:5432/service_template_db
+    depends_on:
+      - service_template_db
+
+  service_template_db:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=service_template_db
+    ports:
+      - "5433:5432"
+    volumes:
+      - service_template_db_data:/var/lib/postgresql/data
+
+volumes:
+  service_template_db_data:

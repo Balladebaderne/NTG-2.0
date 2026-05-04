@@ -1,0 +1,1 @@
+Message broker placeholder. Add broker config or container (e.g., RabbitMQ) here if needed.

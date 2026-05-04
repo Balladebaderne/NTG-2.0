@@ -1,0 +1,1 @@
+Place database migrations and seeds here. Use your preferred migration tool (e.g., node-pg-migrate, knex, Flyway).
