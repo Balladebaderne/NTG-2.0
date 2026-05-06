@@ -16,6 +16,7 @@ All API traffic enters through Traefik on **port 8080**. Routes are defined via 
 | Path prefix | Service |
 |-------------|---------|
 | `/shipments` | `shipments-service` |
+| `/drivers` | `driver-service` |
 | `/items` | `service-template` |
 
 **Dashboard**: http://localhost:9090 (dev only — do not expose in production)
