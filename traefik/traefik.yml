@@ -1,0 +1,14 @@
+# Traefik v3 Static Configuration
+# Dynamic config (routing rules) is handled via Docker labels on each service.
+
+api:
+  insecure: true  # Enables dashboard on :8080 — disable in production
+
+entryPoints:
+  web:
+    address: ":80"
+
+providers:
+  docker:
+    exposedByDefault: false
+    network: ntg_web    # Default network for container IP resolution

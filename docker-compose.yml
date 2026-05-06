@@ -1,10 +1,36 @@
+networks:
+  web:
+    name: ntg_web       # Public-facing: Traefik + routed services
+    driver: bridge
+  internal:
+    name: ntg_internal  # Private: databases only — no internet access
+    driver: bridge
+    internal: true
+
 services:
+  traefik:
+    image: traefik:v3.0
+    command:
+      - "--configFile=/etc/traefik/traefik.yml"
+    ports:
+      - "80:80"       # HTTP entrypoint — all API traffic
+      - "8080:8080"   # Dashboard (dev only)
+    networks:
+      - web
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+      - "./traefik/traefik.yml:/etc/traefik/traefik.yml:ro"
+
   frontend:
     build: ./frontend
-    ports:
-      - "3000:3000"
-    environment:
-      - VITE_API_URL=http://localhost:8080
+    networks:
+      - web             # Only public network — cannot reach databases
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.frontend.rule=PathPrefix(`/`)"
+      - "traefik.http.routers.frontend.entrypoints=web"
+      - "traefik.http.services.frontend.loadbalancer.server.port=3000"
+      - "traefik.docker.network=web"
 
   login-service:
     build: ./Services/loginService
@@ -16,36 +42,31 @@ services:
       - JWT_SECRET=local-login-secret-change-me
       - JWT_EXPIRES_IN=1h
 
-  gateway:
-    build: ./gateway
-    ports:
-      - "8080:8080"
-    environment:
-      - PORT=8080
-      - CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
-      - LOGIN_SERVICE_URL=http://login-service:5001
-    depends_on:
-      - login-service
-      - service-template
-
-  service-template:
-    build: ./Services/service-template
+  shipments-service:
+    build: ./Services/shipmentsService
     environment:
       - PORT=5000
-      - DATABASE_URL=postgres://postgres:postgres@service_template_db:5432/service_template_db
+      - MONGODB_URI=mongodb://shipments_db:27017/shipments_db
     depends_on:
-      - service_template_db
+      - shipments_db
+    networks:
+      - web             # Traefik routes inbound traffic here
+      - internal        # Service reaches shipments_db here
+    labels:
+      - "traefik.enable=true"
+      # Route /shipments (and nested /shipments/:id/goods, etc.) to this service
+      - "traefik.http.routers.shipments.rule=PathPrefix(`/shipments`)"
+      - "traefik.http.routers.shipments.entrypoints=web"
+      - "traefik.http.services.shipments.loadbalancer.server.port=5000"
+      - "traefik.docker.network=web"
 
-  service_template_db:
-    image: postgres:15-alpine
-    environment:
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
-      - POSTGRES_DB=service_template_db
-    ports:
-      - "5433:5432"
+  shipments_db:
+    image: mongo:7
+    networks:
+      - internal        # DB only on internal — not reachable from frontend or Traefik
     volumes:
-      - service_template_db_data:/var/lib/postgresql/data
+      - shipments_db_data:/data/db
+      - ./Services/shipmentsService/Database/init:/docker-entrypoint-initdb.d
 
 volumes:
-  service_template_db_data:
+  shipments_db_data:
