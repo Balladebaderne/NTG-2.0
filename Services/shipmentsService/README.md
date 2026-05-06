@@ -22,6 +22,13 @@ Provides a REST API for creating, updating, and tracking shipments, including ne
 2. `npm install`
 3. `npm start`
 
+### (Optional) Insert Sample Data for Dev
+To populate the database with sample shipments for development/testing, run:
+
+    node src/initSampleData.js
+
+This will clear all existing shipments and insert sample data.
+
 ## Notes
 - MongoDB required (see `.env.example`).
 - All endpoints accept/return JSON.
