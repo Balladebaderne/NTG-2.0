@@ -1,7 +1,7 @@
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080'
+const BASE_URL = import.meta.env.VITE_BACKEND_URL || ''
 
 export async function login(credentials) {
-  const response = await fetch(`${API_URL}/auth/login`, {
+  const response = await fetch(`${BASE_URL}/auth/login`, {
     body: JSON.stringify(credentials),
     headers: {
       'Content-Type': 'application/json',

@@ -1,21 +1,21 @@
 # Docker Compose Architecture
 
-`docker-compose.yml` starts the local NTG development stack and connects the services on one Docker network.
+`docker-compose.yml` starts the local NTG development stack and connects public services to Traefik.
 
 ## Services
 
-- `frontend` runs the Vite React app on port `3000`.
-- `gateway` runs the public API entry point on port `8080`.
+- `traefik` runs the public entry point on port `80` and the dev dashboard on port `9090`.
+- `frontend` runs the Vite React app internally on port `3000`.
 - `login-service` owns authentication and JWT creation on port `5001`.
-- `service-template` is a sample backend service connected to PostgreSQL.
-- `service_template_db` is the PostgreSQL database used by `service-template`.
+- `shipments-service` owns shipment APIs on port `5000`.
+- `shipments_db` is reachable only on the private internal network.
 
 ## Request Flow
 
-The browser loads the React app from `frontend`. When the app needs to log in, it calls the gateway URL from `VITE_API_URL`, currently `http://localhost:8080`.
+The browser loads the React app through Traefik at `http://localhost`. When the app needs to log in, it calls the same origin path `/auth/login`.
 
-The gateway receives `POST /auth/login` and forwards it to `login-service` through Docker DNS at `http://login-service:5001/auth/login`. This keeps the browser talking to one backend entry point while internal services talk to each other by service name.
+Traefik receives `POST /auth/login` and routes it to `login-service` on its internal port `5001`. This keeps the browser talking to one public entry point while internal services stay behind Docker networking.
 
 ## Design Intent
 
-The gateway is intended to be the boundary between the frontend and backend services. The frontend should not need to know every internal service URL. New backend capabilities can be added behind the gateway without changing browser-facing architecture.
+Traefik is the boundary between the frontend and backend services. The frontend should not need to know every internal service URL. New backend capabilities can be added behind the gateway with Docker labels.

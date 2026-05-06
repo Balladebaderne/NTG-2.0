@@ -6,9 +6,9 @@ export function DashboardPage({ onSignOut }) {
       <section className="dashboard" aria-labelledby="dashboard-title">
         <div>
           <p className="eyebrow">Signed in</p>
-          <h1 id="dashboard-title">JWT session active</h1>
+          <h1 id="dashboard-title">JWT + navigation test</h1>
           <p className="dashboard-copy">
-            A signed JWT was issued by the login service and stored for later API requests.
+            A signed JWT was issued and navigation works.
           </p>
         </div>
 

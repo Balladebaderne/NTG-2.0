@@ -89,8 +89,8 @@ _Avoid_: Frontend login data
 - A **User** has exactly one **Role**
 - The **Login User File** contains the current **Users** for the login domain
 - The **Login Domain** issues one **JWT** for a successful login
-- The API gateway forwards `POST /auth/login` to the **Login Domain**
-- The future API gateway will verify the **JWT** before allowing access to protected endpoints
+- Traefik routes `POST /auth/login` to the **Login Domain**
+- Future gateway middleware will verify the **JWT** before allowing access to protected endpoints
 
 ## Example dialogue
 

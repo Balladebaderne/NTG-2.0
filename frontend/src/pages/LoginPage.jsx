@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { login } from '../api/apiGateway'
+import { login } from '../clients/authClient'
 
 export function LoginPage({ onAuthenticated }) {
   const [email, setEmail] = useState('')
@@ -43,8 +43,7 @@ export function LoginPage({ onAuthenticated }) {
         <p className="eyebrow">Secure role access</p>
         <h1 id="page-title">NTG operations login</h1>
         <p className="brand-copy">
-          Sign in through the login service and receive a signed JWT for later protected API
-          access.
+          Sign in through the login service and receive a signed JWT.
         </p>
 
         <div className="status-grid" aria-label="Login capabilities">
