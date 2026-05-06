@@ -11,3 +11,4 @@ entryPoints:
 providers:
   docker:
     exposedByDefault: false
+    network: ntg_web    # Default network for container IP resolution

@@ -1,3 +1,12 @@
+networks:
+  web:
+    name: ntg_web       # Public-facing: Traefik + routed services
+    driver: bridge
+  internal:
+    name: ntg_internal  # Private: databases only — no internet access
+    driver: bridge
+    internal: true
+
 services:
   traefik:
     image: traefik:v3.0
@@ -6,16 +15,22 @@ services:
     ports:
       - "80:80"       # HTTP entrypoint — all API traffic
       - "8080:8080"   # Dashboard (dev only)
+    networks:
+      - web
     volumes:
       - "/var/run/docker.sock:/var/run/docker.sock:ro"
       - "./traefik/traefik.yml:/etc/traefik/traefik.yml:ro"
 
   frontend:
     build: ./frontend
-    ports:
-      - "3000:3000"
-    environment:
-      - REACT_APP_API_URL=http://localhost
+    networks:
+      - web             # Only public network — cannot reach databases
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.frontend.rule=PathPrefix(`/`)"
+      - "traefik.http.routers.frontend.entrypoints=web"
+      - "traefik.http.services.frontend.loadbalancer.server.port=3000"
+      - "traefik.docker.network=web"
 
   shipments-service:
     build: ./Services/shipmentsService
@@ -24,17 +39,21 @@ services:
       - MONGODB_URI=mongodb://shipments_db:27017/shipments_db
     depends_on:
       - shipments_db
+    networks:
+      - web             # Traefik routes inbound traffic here
+      - internal        # Service reaches shipments_db here
     labels:
       - "traefik.enable=true"
       # Route /shipments (and nested /shipments/:id/goods, etc.) to this service
       - "traefik.http.routers.shipments.rule=PathPrefix(`/shipments`)"
       - "traefik.http.routers.shipments.entrypoints=web"
       - "traefik.http.services.shipments.loadbalancer.server.port=5000"
+      - "traefik.docker.network=web"
 
   shipments_db:
     image: mongo:7
-    ports:
-      - "27018:27017"
+    networks:
+      - internal        # DB only on internal — not reachable from frontend or Traefik
     volumes:
       - shipments_db_data:/data/db
       - ./Services/shipmentsService/Database/init:/docker-entrypoint-initdb.d
