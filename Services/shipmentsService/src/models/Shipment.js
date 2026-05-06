@@ -16,7 +16,6 @@ const GoodsSchema = new mongoose.Schema({
 }, { _id: false })
 
 const ShipmentSchema = new mongoose.Schema({
-  shipmentId:                { type: String, default: uuidv4, unique: true },
   status:                    { type: String, enum: ['booked', 'in_transit', 'received'], default: 'booked' },
   senderId:                  { type: String, required: true },
   receiverCustomerId:        { type: String, required: true },

@@ -6,13 +6,14 @@ const Shipment = require('../models/Shipment')
 // POST /shipments/:id/goods
 router.post('/', async (req, res) => {
   try {
-    const shipment = await Shipment.findOne({ shipmentId: req.params.id })
+    const shipment = await Shipment.findById(req.params.id)
     if (!shipment) return res.status(404).json({ error: 'Shipment not found' })
     const goods = { goodsId: uuidv4(), ...req.body, items: req.body.items || [] }
     shipment.goods.push(goods)
     await shipment.save()
     res.status(201).json(shipment.goods[shipment.goods.length - 1])
   } catch (err) {
+    if (err.name === 'CastError') return res.status(404).json({ error: 'Shipment not found' })
     res.status(400).json({ error: err.message })
   }
 })
@@ -20,7 +21,7 @@ router.post('/', async (req, res) => {
 // PUT /shipments/:id/goods/:goodsId
 router.put('/:goodsId', async (req, res) => {
   try {
-    const shipment = await Shipment.findOne({ shipmentId: req.params.id })
+    const shipment = await Shipment.findById(req.params.id)
     if (!shipment) return res.status(404).json({ error: 'Shipment not found' })
     const goods = shipment.goods.find(g => g.goodsId === req.params.goodsId)
     if (!goods) return res.status(404).json({ error: 'Goods not found' })
@@ -28,6 +29,7 @@ router.put('/:goodsId', async (req, res) => {
     await shipment.save()
     res.json(goods)
   } catch (err) {
+    if (err.name === 'CastError') return res.status(404).json({ error: 'Shipment not found' })
     res.status(400).json({ error: err.message })
   }
 })
@@ -35,7 +37,7 @@ router.put('/:goodsId', async (req, res) => {
 // DELETE /shipments/:id/goods/:goodsId
 router.delete('/:goodsId', async (req, res) => {
   try {
-    const shipment = await Shipment.findOne({ shipmentId: req.params.id })
+    const shipment = await Shipment.findById(req.params.id)
     if (!shipment) return res.status(404).json({ error: 'Shipment not found' })
     const idx = shipment.goods.findIndex(g => g.goodsId === req.params.goodsId)
     if (idx === -1) return res.status(404).json({ error: 'Goods not found' })
@@ -43,6 +45,7 @@ router.delete('/:goodsId', async (req, res) => {
     await shipment.save()
     res.json({ message: 'Goods removed' })
   } catch (err) {
+    if (err.name === 'CastError') return res.status(404).json({ error: 'Shipment not found' })
     res.status(500).json({ error: err.message })
   }
 })

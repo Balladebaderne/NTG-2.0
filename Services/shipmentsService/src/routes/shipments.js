@@ -18,10 +18,11 @@ router.get('/', async (req, res) => {
 // GET /shipments/:id
 router.get('/:id', async (req, res) => {
   try {
-    const shipment = await Shipment.findOne({ shipmentId: req.params.id })
+    const shipment = await Shipment.findById(req.params.id)
     if (!shipment) return res.status(404).json({ error: 'Shipment not found' })
     res.json(shipment)
   } catch (err) {
+    if (err.name === 'CastError') return res.status(404).json({ error: 'Shipment not found' })
     res.status(500).json({ error: err.message })
   }
 })
@@ -40,14 +41,15 @@ router.post('/', async (req, res) => {
 // PUT /shipments/:id
 router.put('/:id', async (req, res) => {
   try {
-    const shipment = await Shipment.findOneAndUpdate(
-      { shipmentId: req.params.id },
+    const shipment = await Shipment.findByIdAndUpdate(
+      req.params.id,
       req.body,
       { new: true, runValidators: true }
     )
     if (!shipment) return res.status(404).json({ error: 'Shipment not found' })
     res.json(shipment)
   } catch (err) {
+    if (err.name === 'CastError') return res.status(404).json({ error: 'Shipment not found' })
     res.status(400).json({ error: err.message })
   }
 })
@@ -55,10 +57,11 @@ router.put('/:id', async (req, res) => {
 // DELETE /shipments/:id
 router.delete('/:id', async (req, res) => {
   try {
-    const shipment = await Shipment.findOneAndDelete({ shipmentId: req.params.id })
+    const shipment = await Shipment.findByIdAndDelete(req.params.id)
     if (!shipment) return res.status(404).json({ error: 'Shipment not found' })
     res.json({ message: 'Shipment deleted' })
   } catch (err) {
+    if (err.name === 'CastError') return res.status(404).json({ error: 'Shipment not found' })
     res.status(500).json({ error: err.message })
   }
 })

@@ -22,12 +22,12 @@ Provides a REST API for creating, updating, and tracking shipments, including ne
 2. `npm install`
 3. `npm start`
 
-### (Optional) Insert Sample Data for Dev
-To populate the database with sample shipments for development/testing, run:
+### (Optional) Sample Data for Dev
+Sample shipment data is automatically injected into MongoDB when you run `docker compose up --build`. The data is loaded from:
 
-    node src/initSampleData.js
+    Database/init/init.js
 
-This will clear all existing shipments and insert sample data.
+This file is automatically executed by MongoDB's init system when the container starts. No additional steps needed!
 
 ## Notes
 - MongoDB required (see `.env.example`).
