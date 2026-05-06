@@ -3,7 +3,7 @@
 Traefik v3 acts as the API gateway for NTG. Static config lives in `traefik.yml`. All routing rules are defined via Docker labels on each service — no central routing file to maintain.
 
 - **HTTP entrypoint**: http://localhost (port 80 — all API traffic)
-- **Dashboard**: http://localhost:8080 (dev only — do not expose in production)
+- **Dashboard**: http://localhost:9090 (dev only — do not expose in production)
 
 ---
 
@@ -45,7 +45,7 @@ The **router name** and **service name** (`shipments` above) are just identifier
 Request: GET /shipments/123
          │
          ▼
-   [EntryPoint :8080]
+   [EntryPoint :80]
          │
          ▼
    [Router: "shipments"]          ← rule matches PathPrefix(`/shipments`)
@@ -59,6 +59,9 @@ Request: GET /shipments/123
          ▼
    shipments-service container:5000
 ```
+
+Auth follows the same pattern: `POST /auth/login` is routed by the `auth` router to
+`login-service` on internal port `5001`.
 
 Traefik reads Docker labels in real-time via the mounted Docker socket. When `docker compose up` starts a container, Traefik sees its labels and **automatically builds the router + service** — no Traefik restart needed.
 

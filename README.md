@@ -11,13 +11,15 @@ NTG 2.0
 
 ## API Gateway (Traefik)
 
-All API traffic enters through Traefik on **port 8080**. Routes are defined via Docker labels on each service — no central routing file.
+All app and API traffic enters through Traefik on **port 80**. Routes are defined via Docker labels on each service — no central routing file.
 
 | Path prefix | Service |
 |-------------|---------|
+| `/` | `frontend` |
+| `/auth` | `login-service` |
 | `/shipments` | `shipments-service` |
-| `/items` | `service-template` |
 
+**App**: http://localhost
 **Dashboard**: http://localhost:9090 (dev only — do not expose in production)
 
 ## Run locally

@@ -2,7 +2,7 @@
 
 NTG 2.0 follows a microservice architecture where all external traffic must pass through a single entry point before reaching individual services. Rather than building a custom gateway or using a general-purpose reverse proxy, we chose Traefik v3 as a purpose-built API gateway.
 
-The previous `gateway/` was a 9-line Express.js stub with no routing logic. Maintaining a custom gateway would require implementing routing, load balancing, health checks, and middleware (auth, rate limiting, circuit breaking) by hand — undifferentiated infrastructure work with no domain value. Traefik provides all of this out of the box and integrates directly with Docker Compose via container labels, meaning routing configuration lives next to each service rather than in a central file that must be kept in sync.
+The previous `gateway/` Express stub was removed. Maintaining a custom gateway would require implementing routing, load balancing, health checks, and middleware (auth, rate limiting, circuit breaking) by hand — undifferentiated infrastructure work with no domain value. Traefik provides all of this out of the box and integrates directly with Docker Compose via container labels, meaning routing configuration lives next to each service rather than in a central file that must be kept in sync.
 
 ## Considered Options
 
