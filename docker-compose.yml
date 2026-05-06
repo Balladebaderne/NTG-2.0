@@ -14,7 +14,7 @@ services:
       - "--configFile=/etc/traefik/traefik.yml"
     ports:
       - "80:80"       # HTTP entrypoint — all API traffic
-      - "8080:8080"   # Dashboard (dev only)
+      - "9090:8080"   # Dashboard (dev only)
     networks:
       - web
     volumes:
@@ -31,6 +31,23 @@ services:
       - "traefik.http.routers.frontend.entrypoints=web"
       - "traefik.http.services.frontend.loadbalancer.server.port=3000"
       - "traefik.docker.network=ntg_web"
+
+  login-service:
+    build: ./Services/loginService
+    environment:
+      - PORT=5001
+      - CORS_ORIGIN=http://localhost
+      - JWT_SECRET=local-login-secret-change-me
+      - JWT_EXPIRES_IN=1h
+    networks:
+      - web
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.auth.rule=PathPrefix(`/auth`)"
+      - "traefik.http.routers.auth.entrypoints=web"
+      - "traefik.http.routers.auth.priority=100"
+      - "traefik.http.services.auth.loadbalancer.server.port=5001"
+      - "traefik.docker.network=web"
 
   shipments-service:
     build: ./Services/shipmentsService

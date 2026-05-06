@@ -1,9 +1,7 @@
 import React from 'react'
 import { createRoot } from 'react-dom/client'
-
-function App(){
-  return <h1>NTG Frontend — Hello World</h1>
-}
+import { App } from './App'
+import './styles.css'
 
 const root = document.getElementById('root') || document.body.appendChild(document.createElement('div'))
 createRoot(root).render(<App />)
