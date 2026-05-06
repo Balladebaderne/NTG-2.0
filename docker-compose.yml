@@ -30,7 +30,7 @@ services:
       - "traefik.http.routers.frontend.rule=PathPrefix(`/`)"
       - "traefik.http.routers.frontend.entrypoints=web"
       - "traefik.http.services.frontend.loadbalancer.server.port=3000"
-      - "traefik.docker.network=web"
+      - "traefik.docker.network=ntg_web"
 
   login-service:
     build: ./Services/loginService
@@ -65,7 +65,7 @@ services:
       - "traefik.http.routers.shipments.rule=PathPrefix(`/shipments`)"
       - "traefik.http.routers.shipments.entrypoints=web"
       - "traefik.http.services.shipments.loadbalancer.server.port=5000"
-      - "traefik.docker.network=web"
+      - "traefik.docker.network=ntg_web"
 
   shipments_db:
     image: mongo:7
@@ -75,5 +75,35 @@ services:
       - shipments_db_data:/data/db
       - ./Services/shipmentsService/Database/init:/docker-entrypoint-initdb.d
 
+  driver-service:
+    build: ./Services/driverService
+    environment:
+      - PORT=5001
+      - DATABASE_URL=postgres://postgres:postgres@driver_db:5432/driver_db
+    depends_on:
+      - driver_db
+    networks:
+      - web
+      - internal
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.drivers.rule=PathPrefix(`/drivers`)"
+      - "traefik.http.routers.drivers.entrypoints=web"
+      - "traefik.http.services.drivers.loadbalancer.server.port=5001"
+      - "traefik.docker.network=ntg_web"
+
+  driver_db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: driver_db
+    networks:
+      - internal
+    volumes:
+      - driver_db_data:/var/lib/postgresql/data
+      - ./Services/driverService/Database/init:/docker-entrypoint-initdb.d
+
 volumes:
   shipments_db_data:
+  driver_db_data:

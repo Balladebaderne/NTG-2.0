@@ -18,6 +18,8 @@ All app and API traffic enters through Traefik on **port 80**. Routes are define
 | `/` | `frontend` |
 | `/auth` | `login-service` |
 | `/shipments` | `shipments-service` |
+| `/drivers` | `driver-service` |
+| `/items` | `service-template` |
 
 **App**: http://localhost
 **Dashboard**: http://localhost:9090 (dev only — do not expose in production)
