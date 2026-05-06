@@ -1,38 +1,43 @@
 services:
+  traefik:
+    image: traefik:v3.0
+    command:
+      - "--configFile=/etc/traefik/traefik.yml"
+    ports:
+      - "80:80"       # HTTP entrypoint — all API traffic
+      - "8080:8080"   # Dashboard (dev only)
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+      - "./traefik/traefik.yml:/etc/traefik/traefik.yml:ro"
+
   frontend:
     build: ./frontend
     ports:
       - "3000:3000"
     environment:
-      - REACT_APP_API_URL=http://localhost:8080
+      - REACT_APP_API_URL=http://localhost
 
-  gateway:
-    build: ./gateway
-    ports:
-      - "8080:8080"
-    environment:
-      - PORT=8080
-    depends_on:
-      - service-template
-
-  service-template:
-    build: ./Services/service-template
+  shipments-service:
+    build: ./Services/shipmentsService
     environment:
       - PORT=5000
-      - DATABASE_URL=postgres://postgres:postgres@service_template_db:5432/service_template_db
+      - MONGODB_URI=mongodb://shipments_db:27017/shipments_db
     depends_on:
-      - service_template_db
+      - shipments_db
+    labels:
+      - "traefik.enable=true"
+      # Route /shipments (and nested /shipments/:id/goods, etc.) to this service
+      - "traefik.http.routers.shipments.rule=PathPrefix(`/shipments`)"
+      - "traefik.http.routers.shipments.entrypoints=web"
+      - "traefik.http.services.shipments.loadbalancer.server.port=5000"
 
-  service_template_db:
-    image: postgres:15-alpine
-    environment:
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
-      - POSTGRES_DB=service_template_db
+  shipments_db:
+    image: mongo:7
     ports:
-      - "5433:5432"
+      - "27018:27017"
     volumes:
-      - service_template_db_data:/var/lib/postgresql/data
+      - shipments_db_data:/data/db
+      - ./Services/shipmentsService/Database/init:/docker-entrypoint-initdb.d
 
 volumes:
-  service_template_db_data:
+  shipments_db_data:
