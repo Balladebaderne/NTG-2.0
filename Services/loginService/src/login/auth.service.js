@@ -1,14 +1,14 @@
 function createAuthService({ jwtService, usersRepository }) {
   return {
-    async login({ email, password, role }) {
-      if (!email || !password || !role) {
+    async login({ email, password }) {
+      if (!email || !password) {
         throw invalidCredentials()
       }
 
       const user = await usersRepository.findByEmail(email)
       const passwordMatches = user ? user.password === password : false
 
-      if (!user || !passwordMatches || user.role !== role) {
+      if (!user || !passwordMatches) {
         throw invalidCredentials()
       }
 

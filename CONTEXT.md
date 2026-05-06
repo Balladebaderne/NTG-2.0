@@ -22,13 +22,14 @@ _Avoid_: Demo token, session id
 
 **Login User File**:
 A JSON file owned by the **Login Domain** that contains the users accepted by `POST /auth/login`.
-_Avoid_: Frontend login data, SQLite users
+_Avoid_: Frontend login data
 
 ## Relationships
 
 - A **User** has exactly one **Role**
 - The **Login User File** contains the current **Users** for the login domain
 - The **Login Domain** issues one **JWT** for a successful login
+- The API gateway forwards `POST /auth/login` to the **Login Domain**
 - The future API gateway will verify the **JWT** before allowing access to protected endpoints
 
 ## Example dialogue
@@ -39,4 +40,4 @@ _Avoid_: Frontend login data, SQLite users
 ## Flagged ambiguities
 
 - Python `app.py` service files were accidental scaffolding; the intended service stack is React, Node.js, and Express.
-- SQLite was rejected for the first login domain iteration; credentials are checked against the login service JSON user file.
+- Credentials are checked against the login service JSON user file.

@@ -4,7 +4,7 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - VITE_AUTH_API_URL=http://localhost:5001
+      - VITE_API_URL=http://localhost:8080
 
   login-service:
     build: ./Services/loginService
@@ -22,7 +22,10 @@ services:
       - "8080:8080"
     environment:
       - PORT=8080
+      - CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
+      - LOGIN_SERVICE_URL=http://login-service:5001
     depends_on:
+      - login-service
       - service-template
 
   service-template:

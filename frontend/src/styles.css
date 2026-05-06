@@ -115,8 +115,7 @@ h2 {
   margin-top: 48px;
 }
 
-.status-grid span,
-.permission-panel span {
+.status-grid span {
   border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: 8px;
   display: block;
@@ -138,77 +137,11 @@ h2 {
   margin-bottom: 32px;
 }
 
-.text-button {
-  background: transparent;
-  border: 0;
-  color: #0f6f78;
-  font-size: 0.92rem;
-  font-weight: 800;
-  min-height: 44px;
-  padding: 0;
-  text-align: right;
-}
-
-.text-button:hover {
-  color: #094a50;
-}
-
-.role-picker {
-  border: 0;
-  margin: 0 0 28px;
-  padding: 0;
-}
-
-.role-picker legend,
 .field label {
   color: #38474f;
   font-size: 0.92rem;
   font-weight: 800;
   margin-bottom: 10px;
-}
-
-.role-grid {
-  display: grid;
-  gap: 10px;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.role-option {
-  background: #ffffff;
-  border: 1px solid #d8e2e2;
-  border-radius: 8px;
-  color: #1f2c33;
-  min-height: 92px;
-  padding: 14px;
-  text-align: left;
-  transition:
-    border-color 180ms ease,
-    box-shadow 180ms ease,
-    transform 180ms ease;
-}
-
-.role-option:hover,
-.role-option[aria-pressed='true'] {
-  border-color: #0f6f78;
-  box-shadow: 0 12px 28px rgba(15, 111, 120, 0.14);
-}
-
-.role-option:active {
-  transform: translateY(1px);
-}
-
-.role-option span {
-  display: block;
-  font-weight: 850;
-  line-height: 1.25;
-}
-
-.role-option small {
-  color: #5d6f76;
-  display: block;
-  font-size: 0.78rem;
-  line-height: 1.35;
-  margin-top: 8px;
 }
 
 .login-form {
@@ -233,12 +166,9 @@ h2 {
 }
 
 .field input:focus,
-.role-option:focus-visible,
-.text-button:focus-visible,
 .primary-button:focus-visible,
 .secondary-button:focus-visible,
-.password-toggle:focus-visible,
-.checkbox-row input:focus-visible {
+.password-toggle:focus-visible {
   box-shadow: 0 0 0 4px rgba(15, 111, 120, 0.22);
   outline: 2px solid #0f6f78;
   outline-offset: 2px;
@@ -264,20 +194,6 @@ h2 {
   position: absolute;
   right: 7px;
   top: 7px;
-}
-
-.checkbox-row {
-  align-items: center;
-  color: #38474f;
-  display: flex;
-  gap: 10px;
-  line-height: 1.4;
-}
-
-.checkbox-row input {
-  accent-color: #0f6f78;
-  height: 18px;
-  width: 18px;
 }
 
 .form-error {
@@ -340,18 +256,6 @@ h2 {
   color: #52636b;
 }
 
-.permission-panel {
-  display: grid;
-  gap: 10px;
-  margin: 28px 0;
-}
-
-.permission-panel span {
-  background: #f3f8f7;
-  border-color: #d8e2e2;
-  color: #284149;
-}
-
 .secondary-button {
   background: #172026;
   color: #ffffff;
@@ -382,11 +286,6 @@ h2 {
     display: grid;
   }
 
-  .text-button {
-    text-align: left;
-  }
-
-  .role-grid,
   .status-grid {
     grid-template-columns: 1fr;
   }
