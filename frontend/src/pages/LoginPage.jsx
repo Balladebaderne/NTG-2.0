@@ -40,10 +40,9 @@ export function LoginPage({ onAuthenticated }) {
         <div className="brand-mark" aria-hidden="true">
           NTG
         </div>
-        <p className="eyebrow">Secure role access</p>
-        <h1 id="page-title">NTG operations login</h1>
+        <h1 id="page-title">NTG operations</h1>
         <p className="brand-copy">
-          Sign in through the login service and receive a signed JWT.
+          Lorem ipsum dolor sit amet.
         </p>
 
         <div className="status-grid" aria-label="Login capabilities">
