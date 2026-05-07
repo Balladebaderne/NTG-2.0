@@ -72,7 +72,28 @@ services:
     volumes:
       - sender_db_data:/data/db
 
+  ai-chat-service:
+    build: ./Services/aiChatService
+    ports:
+      - "5007:5004"
+    environment:
+      - PORT=5004
+      - MONGODB_URI=mongodb://ai_chat_db:27017/ai_chat_db
+      - SHIPMENTS_URL=http://shipments-service:5000
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+    depends_on:
+      - ai_chat_db
+      - shipments-service
+
+  ai_chat_db:
+    image: mongo:7
+    ports:
+      - "27021:27017"
+    volumes:
+      - ai_chat_db_data:/data/db
+
 volumes:
   service_template_db_data:
   shipments_db_data:
   sender_db_data:
+  ai_chat_db_data:
