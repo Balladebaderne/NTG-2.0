@@ -75,6 +75,38 @@ services:
       - shipments_db_data:/data/db
       - ./Services/shipmentsService/Database/init:/docker-entrypoint-initdb.d
 
+  tracking-service:
+    build: ./Services/trackingService
+    environment:
+      - PORT=5000
+      - DATABASE_URL=postgres://postgres:postgres@tracking_db:5432/tracking_db
+      - SHIPMENTS_SERVICE_URL=http://shipments-service:5000
+      - VERIFY_SHIPMENTS=true
+      - SHIPMENT_STATUS_SYNC_ENABLED=true
+      - HTTP_TIMEOUT_SECONDS=3
+    depends_on:
+      - tracking_db
+    networks:
+      - web
+      - internal
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.tracking.rule=PathPrefix(`/tracking`)"
+      - "traefik.http.routers.tracking.entrypoints=web"
+      - "traefik.http.services.tracking.loadbalancer.server.port=5000"
+      - "traefik.docker.network=ntg_web"
+
+  tracking_db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: tracking_db
+    networks:
+      - internal
+    volumes:
+      - tracking_db_data:/var/lib/postgresql/data
+
   driver-service:
     build: ./Services/driverService
     environment:
@@ -178,5 +210,8 @@ services:
 
 volumes:
   shipments_db_data:
+  tracking_db_data:
+  driver_db_data:
+  notification_db_data:
   sender_db_data:
   ai_chat_db_data:

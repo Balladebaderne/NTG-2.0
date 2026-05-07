@@ -8,7 +8,7 @@ It does not own the Shipment aggregate. Shipment identity, Sender, ReceiverCusto
 
 ## Boundary
 
-`trackingService` stores events against a Shipment reference. In the current NTG services this reference is `shipmentId`; API responses also expose it as `shipmentNumber` so the tracking UI can use shipment-number wording without changing storage ownership.
+`trackingService` stores events against a Shipment reference. In the current NTG services this reference is the Mongo `_id` returned by `shipmentsService`; API responses also expose the same value as `shipmentNumber` so the tracking UI can use shipment-number wording without changing storage ownership.
 
 The service must not read or write the shipments MongoDB database directly. When it needs to know whether a Shipment exists, it calls `shipmentsService` through its REST API.
 
@@ -36,6 +36,8 @@ Tracking has a richer operational event flow than the coarse Shipment lifecycle 
 | 140 | `shipment_completed_closed` | Shipment completed and closed | yes |
 
 The service validates that required flow events are not skipped, that the flow cannot move backwards, and that nothing can be appended after `shipment_completed_closed`.
+
+`trackingService` does not create Shipments and does not auto-create the first tracking event by itself. After `shipmentsService` creates a Shipment, the caller that coordinates the workflow should post `shipment_order_created` using the Shipment Mongo `_id`.
 
 Legacy event types are accepted and normalized for old clients:
 
