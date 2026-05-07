@@ -6,8 +6,45 @@ networks:
     name: ntg_internal  # Private: databases only — no internet access
     driver: bridge
     internal: true
+  broker:
+    name: ntg_broker    # Broker network: RabbitMQ + message-broker service
+    driver: bridge
+    internal: true
 
 services:
+  rabbitmq:
+    image: rabbitmq:3-management
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    ports:
+      - "15672:15672"   # Management UI (dev only)
+    networks:
+      - broker          # AMQP traffic stays internal
+      - web             # Needed for host port binding on Docker Desktop
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  message-broker:
+    build: ./messageBroker
+    environment:
+      - PORT=3000
+      - RABBITMQ_HOST=rabbitmq
+      - RABBITMQ_PORT=5672
+      - RABBITMQ_USER=guest
+      - RABBITMQ_PASS=guest
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - broker
+
+
   traefik:
     image: traefik:v3.0
     command:
@@ -151,3 +188,4 @@ volumes:
   shipments_db_data:
   driver_db_data:
   loyalty_db_data:
+  rabbitmq_data:
