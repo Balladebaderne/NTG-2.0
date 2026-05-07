@@ -2,86 +2,64 @@
 
 ## Purpose
 
-`trackingService` owns Shipment tracking history: events, latest known location, timestamps, route progress references, and driver references.
+`trackingService` owns Shipment tracking history: operational events, latest known location, route progress references, driver/carrier references, and POD references.
 
-It does not own the Shipment aggregate. Shipment identity, Sender, ReceiverCustomer, Goods, Items, current lifecycle `status`, and `routeId` stay in `shipmentsService`.
+It does not own the Shipment aggregate. Shipment identity, Sender, ReceiverCustomer, Goods, Items, routeId, and the coarse lifecycle status stay in `shipmentsService`.
 
 ## Boundary
 
-`trackingService` references Shipments by `shipmentId` only.
+`trackingService` stores events against a Shipment reference. In the current NTG services this reference is `shipmentId`; API responses also expose it as `shipmentNumber` so the tracking UI can use shipment-number wording without changing storage ownership.
 
-It must not read or write the shipments MongoDB database directly. When it needs to know whether a Shipment exists, it calls `shipmentsService` through its REST API.
-
-## Recommended Runtime Shape
-
-- Language/framework: Node.js + Express
-- Database: PostgreSQL owned by `trackingService`
-- External dependency: `shipmentsService`
-- API format: JSON using the same domain terms as the rest of NTG
-- Map ownership: `trackingService` stores coordinates; the frontend renders maps with a map provider
-
-## File Layout
-
-```txt
-trackingService/
-├── Dockerfile
-├── package.json
-├── src/
-│   ├── app.js
-│   ├── index.js
-│   ├── config.js
-│   ├── db.js
-│   ├── models/
-│   │   └── TrackingEvent.js
-│   ├── routes/
-│   │   └── tracking.js
-│   └── services/
-│       └── shipmentsClient.js
-└── docs/adr/
-```
-
-## Data Ownership
-
-| Concept | Owner |
-|---|---|
-| Shipment identity | `shipmentsService` |
-| Sender / ReceiverCustomer | `shipmentsService` |
-| Goods / Items | `shipmentsService` |
-| Current Shipment lifecycle status | `shipmentsService` |
-| Tracking event history | `trackingService` |
-| Latest known Shipment location | `trackingService` |
-| Driver/location progress references | `trackingService` |
+The service must not read or write the shipments MongoDB database directly. When it needs to know whether a Shipment exists, it calls `shipmentsService` through its REST API.
 
 ## Tracking Lifecycle
 
-Current Shipment lifecycle:
+Tracking has a richer operational event flow than the coarse Shipment lifecycle in `shipmentsService`.
 
-```txt
-booked -> in_transit -> received
-```
+| Order | eventType | Meaning | Required |
+|---:|---|---|---|
+| 10 | `shipment_order_created` | Shipment order created | yes |
+| 20 | `transport_planned_carrier_assigned` | Transport planned and carrier assigned | yes |
+| 30 | `pickup_scheduled` | Pickup scheduled | yes |
+| 40 | `truck_arrived_pickup` | Truck arrives at pickup location | yes |
+| 50 | `goods_loaded_pickup_confirmed` | Goods loaded and pickup confirmed | yes |
+| 60 | `shipment_in_transit` | Shipment in transit | yes |
+| 70 | `departed_origin_terminal` | Departure from origin terminal | optional |
+| 80 | `in_transit_milestone` | In transit milestone update, such as border crossing or hub arrival | optional, repeatable |
+| - | `delay_logged` | Delay logged | optional side event |
+| - | `exception_logged` | Exception logged | optional side event |
+| 90 | `arrived_destination_terminal` | Arrival at destination terminal | optional |
+| 100 | `out_for_delivery` | Out for delivery | yes |
+| 110 | `truck_arrived_delivery` | Truck arrives at delivery location | yes |
+| 120 | `goods_delivered` | Goods delivered | yes |
+| 130 | `pod_confirmed` | Proof of Delivery (POD) confirmed | yes |
+| 140 | `shipment_completed_closed` | Shipment completed and closed | yes |
 
-Tracking events provide the history behind that lifecycle.
+The service validates that required flow events are not skipped, that the flow cannot move backwards, and that nothing can be appended after `shipment_completed_closed`.
 
-Recommended event types:
+Legacy event types are accepted and normalized for old clients:
 
-| eventType | Meaning | Shipment status effect |
-|---|---|---|
-| `tracking_started` | Tracking record begins for a Shipment | can reflect `booked` |
-| `picked_up` | Driver has picked up the Goods | syncs Shipment to `in_transit` |
-| `location_updated` | Latest driver/Shipment coordinates were reported | usually keeps `in_transit` |
-| `checkpoint_reached` | Shipment passed a known route checkpoint | usually keeps `in_transit` |
-| `delayed` | Shipment progress changed because of a delay | no automatic status change |
-| `exception_reported` | Something abnormal happened during transport | no automatic status change |
-| `received` | ReceiverCustomer confirmed receipt | syncs Shipment to `received` |
+| Legacy | Canonical |
+|---|---|
+| `tracking_started` | `shipment_order_created` |
+| `picked_up` | `goods_loaded_pickup_confirmed` |
+| `checkpoint_reached` | `in_transit_milestone` |
+| `delayed` | `delay_logged` |
+| `exception_reported` | `exception_logged` |
+| `received` | `goods_delivered` |
 
-The service should reject invalid Shipment statuses. It should also prevent milestone contradictions such as a `received` tracking event with `status: "in_transit"`.
+## Status Semantics
+
+- Event `status` is the coarse Shipment lifecycle status supported by `shipmentsService`: `booked`, `in_transit`, or `received`.
+- Top-level `status` from `GET /tracking/shipments/:shipmentNumber/status` is the current tracking event type, such as `out_for_delivery`.
+- `shipmentLifecycleStatus` is returned beside it when the caller needs the coarse lifecycle state.
 
 ## API
 
 Base route:
 
 ```txt
-/tracking/shipments/:shipmentId
+/tracking/shipments/:shipmentNumber
 ```
 
 ### Health
@@ -90,27 +68,17 @@ Base route:
 GET /health
 ```
 
-Response:
-
-```json
-{
-  "status": "ok",
-  "service": "tracking-service"
-}
-```
-
 ### Create Tracking Event
 
 ```txt
-POST /tracking/shipments/:shipmentId/events
+POST /tracking/shipments/:shipmentNumber/events
 ```
 
 Request:
 
 ```json
 {
-  "eventType": "location_updated",
-  "status": "in_transit",
+  "eventType": "transport_planned_carrier_assigned",
   "occurredAt": "2026-05-06T12:30:00.000Z",
   "location": {
     "lat": 55.6761,
@@ -119,8 +87,13 @@ Request:
   },
   "routeId": "route-123",
   "driverId": "driver-456",
-  "notes": "Passed checkpoint",
-  "idempotencyKey": "gps-ping-123"
+  "carrierId": "carrier-789",
+  "podReference": "POD-123",
+  "notes": "Carrier assigned",
+  "metadata": {
+    "carrierName": "NTG Road"
+  },
+  "idempotencyKey": "planning-123"
 }
 ```
 
@@ -131,8 +104,13 @@ Response:
   "event": {
     "trackingEventId": "uuid",
     "shipmentId": "shipment-uuid",
-    "eventType": "location_updated",
-    "status": "in_transit",
+    "shipmentNumber": "shipment-uuid",
+    "eventType": "transport_planned_carrier_assigned",
+    "canonicalEventType": "transport_planned_carrier_assigned",
+    "eventLabel": "Transport planned and carrier assigned",
+    "eventOrder": 20,
+    "status": "booked",
+    "shipmentLifecycleStatus": "booked",
     "occurredAt": "2026-05-06T12:30:00.000Z",
     "location": {
       "lat": 55.6761,
@@ -141,8 +119,13 @@ Response:
     },
     "routeId": "route-123",
     "driverId": "driver-456",
-    "notes": "Passed checkpoint",
-    "idempotencyKey": "gps-ping-123",
+    "carrierId": "carrier-789",
+    "podReference": null,
+    "notes": "Carrier assigned",
+    "metadata": {
+      "carrierName": "NTG Road"
+    },
+    "idempotencyKey": "planning-123",
     "createdAt": "2026-05-06T12:30:01.000Z"
   },
   "shipmentStatusSync": {
@@ -157,91 +140,62 @@ Response:
 Convenience endpoint for GPS/location pings:
 
 ```txt
-POST /tracking/shipments/:shipmentId/location
+POST /tracking/shipments/:shipmentNumber/location
 ```
 
-Request:
-
-```json
-{
-  "location": {
-    "lat": 55.6761,
-    "lng": 12.5683,
-    "label": "Copenhagen"
-  },
-  "occurredAt": "2026-05-06T12:30:00.000Z",
-  "routeId": "route-123",
-  "driverId": "driver-456",
-  "notes": "Driver GPS ping",
-  "idempotencyKey": "gps-ping-123"
-}
-```
-
-Internally this creates a `location_updated` tracking event.
+Internally this creates a `location_updated` tracking event. It does not advance the operational milestone flow.
 
 ### List Events
 
 ```txt
-GET /tracking/shipments/:shipmentId/events?limit=100&order=asc
+GET /tracking/shipments/:shipmentNumber/events?limit=100&order=asc
 ```
 
-Response:
+Returns the event history only.
 
-```json
-[
-  {
-    "trackingEventId": "uuid",
-    "shipmentId": "shipment-uuid",
-    "eventType": "picked_up",
-    "status": "in_transit",
-    "occurredAt": "2026-05-06T10:15:00.000Z",
-    "location": {
-      "lat": 55.6761,
-      "lng": 12.5683,
-      "label": "Copenhagen"
-    },
-    "routeId": "route-123",
-    "driverId": "driver-456",
-    "notes": "Goods picked up",
-    "idempotencyKey": null,
-    "createdAt": "2026-05-06T10:15:01.000Z"
-  }
-]
-```
-
-### Latest Tracking State
+### Latest Tracking Summary
 
 ```txt
-GET /tracking/shipments/:shipmentId/latest
+GET /tracking/shipments/:shipmentNumber/latest
+GET /tracking/shipments/:shipmentNumber
 ```
 
-Response:
+Returns the current tracking summary without history.
+
+### Current Status And History
+
+```txt
+GET /tracking/shipments/:shipmentNumber/status?limit=100&order=asc
+```
+
+Verifies the Shipment reference through `shipmentsService`, then returns the current tracking event as `status` plus the Shipment's event history.
 
 ```json
 {
   "shipmentId": "shipment-uuid",
-  "status": "in_transit",
+  "shipmentNumber": "shipment-uuid",
+  "status": "out_for_delivery",
+  "statusLabel": "Out for delivery",
+  "currentEvent": {
+    "trackingEventId": "uuid",
+    "eventType": "out_for_delivery",
+    "eventLabel": "Out for delivery",
+    "status": "out_for_delivery",
+    "shipmentLifecycleStatus": "in_transit",
+    "occurredAt": "2026-05-06T15:30:00.000Z",
+    "location": null
+  },
+  "shipmentLifecycleStatus": "in_transit",
   "latestLocation": {
     "lat": 55.6761,
     "lng": 12.5683,
     "label": "Copenhagen"
   },
-  "lastUpdatedAt": "2026-05-06T12:30:00.000Z",
-  "latestEvent": {
-    "trackingEventId": "uuid",
-    "eventType": "location_updated"
-  },
-  "eventCount": 4
+  "lastUpdatedAt": "2026-05-06T15:30:00.000Z",
+  "eventCount": 8,
+  "history": []
 }
 ```
-
-### Tracking Summary
-
-```txt
-GET /tracking/shipments/:shipmentId
-```
-
-Returns the same current tracking summary as `/latest`. This gives the frontend one obvious endpoint for map marker state.
 
 ## Database Model
 
@@ -249,7 +203,7 @@ Recommended table:
 
 ```sql
 CREATE TABLE tracking_events (
-  tracking_event_id UUID PRIMARY KEY,
+  tracking_event_id TEXT PRIMARY KEY,
   shipment_id TEXT NOT NULL,
   event_type TEXT NOT NULL,
   status TEXT,
@@ -259,58 +213,16 @@ CREATE TABLE tracking_events (
   location_label TEXT,
   route_id TEXT,
   driver_id TEXT,
+  carrier_id TEXT,
+  pod_reference TEXT,
   notes TEXT,
+  metadata JSONB,
   idempotency_key TEXT,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  CONSTRAINT tracking_events_status_check
-    CHECK (status IN ('booked', 'in_transit', 'received') OR status IS NULL),
-  CONSTRAINT tracking_events_event_type_check
-    CHECK (event_type IN (
-      'tracking_started',
-      'picked_up',
-      'location_updated',
-      'checkpoint_reached',
-      'delayed',
-      'exception_reported',
-      'received'
-    )),
-  CONSTRAINT tracking_events_location_pair_check
-    CHECK (
-      (latitude IS NULL AND longitude IS NULL)
-      OR
-      (latitude IS NOT NULL AND longitude IS NOT NULL)
-    )
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
-
-CREATE INDEX tracking_events_shipment_occurred_idx
-  ON tracking_events (shipment_id, occurred_at DESC);
-
-CREATE UNIQUE INDEX tracking_events_idempotency_idx
-  ON tracking_events (shipment_id, idempotency_key)
-  WHERE idempotency_key IS NOT NULL;
 ```
 
-## Map API Position
-
-`trackingService` should not render maps and should not depend on a map tile provider for its core behavior.
-
-It stores:
-
-- latitude
-- longitude
-- optional human-readable location label
-- time of observation
-
-The frontend chooses a map provider such as Mapbox, Google Maps, or Leaflet/OpenStreetMap and places markers using the coordinates returned by `trackingService`.
-
-Optional future integrations:
-
-- geocoding coordinates into labels
-- reverse geocoding labels into coordinates
-- ETA calculation using route services
-- map-matching noisy GPS pings to known roads
-
-Those should be added behind clear interfaces so tracking event storage remains provider-neutral.
+`ensureSchema()` creates this table, adds missing columns for existing databases, and updates the `event_type` check constraint to include the canonical flow plus legacy event types.
 
 ## Integration With shipmentsService
 
@@ -320,33 +232,21 @@ Environment variable:
 SHIPMENTS_SERVICE_URL=http://shipments-service:5000
 ```
 
-Before creating a tracking event, `trackingService` should verify the Shipment exists:
+Before creating a tracking event, `trackingService` verifies the Shipment exists:
 
 ```txt
-GET {SHIPMENTS_SERVICE_URL}/shipments/:shipmentId
+GET {SHIPMENTS_SERVICE_URL}/shipments/:shipmentNumber
 ```
 
-For lifecycle milestone events:
+Lifecycle sync is intentionally coarse because `shipmentsService` currently supports only `booked`, `in_transit`, and `received`.
 
-```txt
-PUT {SHIPMENTS_SERVICE_URL}/shipments/:shipmentId
-```
-
-Payload examples:
-
-```json
-{ "status": "in_transit" }
-```
-
-```json
-{ "status": "received" }
-```
-
-Recommended sync behavior:
-
-- If Shipment verification returns `404`, reject the tracking event.
-- If `shipmentsService` is unavailable, return `503` unless verification is explicitly disabled for local development.
-- If a lifecycle status sync fails after the event is stored, return the event plus a failed sync result so the caller can retry.
+| Tracking event | Synced Shipment status |
+|---|---|
+| `goods_loaded_pickup_confirmed` | `in_transit` |
+| `shipment_in_transit` | `in_transit` |
+| `goods_delivered` | `received` |
+| `pod_confirmed` | `received` |
+| `shipment_completed_closed` | `received` |
 
 ## Environment
 
@@ -359,41 +259,7 @@ SHIPMENT_STATUS_SYNC_ENABLED=true
 HTTP_TIMEOUT_SECONDS=3
 ```
 
-For isolated local development, point `DATABASE_URL` at any local PostgreSQL database and disable calls to `shipmentsService`:
-
-```txt
-DATABASE_URL=postgres://postgres:postgres@localhost:5432/tracking_db
-VERIFY_SHIPMENTS=false
-SHIPMENT_STATUS_SYNC_ENABLED=false
-```
-
-## Implementation Checklist
-
-1. Add Express app with `/health`.
-2. Add PostgreSQL connection using `DATABASE_URL`.
-3. Add `tracking_events` table bootstrap.
-4. Add request/response validation using NTG domain terms.
-5. Add event creation endpoint.
-6. Add location convenience endpoint.
-7. Add event listing endpoint.
-8. Add latest tracking summary endpoint.
-9. Verify `shipmentId` through `shipmentsService`.
-10. Sync Shipment status for `picked_up` and `received`.
-11. Add idempotency support for repeated GPS pings.
-12. Add tests with a dedicated test PostgreSQL database or mocked DB boundary.
-13. Wire service into Docker Compose later from outside this folder.
-
-## Local Run
-
-```txt
-npm install
-set DATABASE_URL=postgres://postgres:postgres@localhost:5432/tracking_db
-set VERIFY_SHIPMENTS=false
-set SHIPMENT_STATUS_SYNC_ENABLED=false
-npm start
-```
-
-PowerShell equivalent:
+For isolated local development:
 
 ```powershell
 $env:DATABASE_URL="postgres://postgres:postgres@localhost:5432/tracking_db"

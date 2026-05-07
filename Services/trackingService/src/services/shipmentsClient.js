@@ -19,9 +19,10 @@ async function fetchWithTimeout(url, options = {}) {
 async function verifyShipmentExists(shipmentId) {
   if (!verifyShipments) return
 
+  const encodedShipmentId = encodeURIComponent(shipmentId)
   let response
   try {
-    response = await fetchWithTimeout(`${shipmentsServiceUrl}/shipments/${shipmentId}`)
+    response = await fetchWithTimeout(`${shipmentsServiceUrl}/shipments/${encodedShipmentId}`)
   } catch (err) {
     const unavailable = new Error(`shipmentsService unavailable: ${err.message}`)
     unavailable.status = 503
@@ -57,7 +58,8 @@ async function syncShipmentStatus(shipmentId, shipmentStatus) {
   }
 
   try {
-    const response = await fetchWithTimeout(`${shipmentsServiceUrl}/shipments/${shipmentId}`, {
+    const encodedShipmentId = encodeURIComponent(shipmentId)
+    const response = await fetchWithTimeout(`${shipmentsServiceUrl}/shipments/${encodedShipmentId}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status: shipmentStatus }),

@@ -17,16 +17,35 @@ async function ensureSchema() {
       location_label TEXT,
       route_id TEXT,
       driver_id TEXT,
+      carrier_id TEXT,
+      pod_reference TEXT,
       notes TEXT,
+      metadata JSONB,
       idempotency_key TEXT,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       CONSTRAINT tracking_events_status_check
         CHECK (status IN ('booked', 'in_transit', 'received') OR status IS NULL),
       CONSTRAINT tracking_events_event_type_check
         CHECK (event_type IN (
+          'shipment_order_created',
+          'transport_planned_carrier_assigned',
+          'pickup_scheduled',
+          'truck_arrived_pickup',
+          'goods_loaded_pickup_confirmed',
+          'shipment_in_transit',
+          'departed_origin_terminal',
+          'in_transit_milestone',
+          'delay_logged',
+          'exception_logged',
+          'arrived_destination_terminal',
+          'out_for_delivery',
+          'truck_arrived_delivery',
+          'goods_delivered',
+          'pod_confirmed',
+          'shipment_completed_closed',
+          'location_updated',
           'tracking_started',
           'picked_up',
-          'location_updated',
           'checkpoint_reached',
           'delayed',
           'exception_reported',
@@ -39,6 +58,45 @@ async function ensureSchema() {
           (latitude IS NOT NULL AND longitude IS NOT NULL)
         )
     )
+  `)
+
+  await pool.query('ALTER TABLE tracking_events ADD COLUMN IF NOT EXISTS carrier_id TEXT')
+  await pool.query('ALTER TABLE tracking_events ADD COLUMN IF NOT EXISTS pod_reference TEXT')
+  await pool.query('ALTER TABLE tracking_events ADD COLUMN IF NOT EXISTS metadata JSONB')
+
+  await pool.query(`
+    ALTER TABLE tracking_events
+    DROP CONSTRAINT IF EXISTS tracking_events_event_type_check
+  `)
+
+  await pool.query(`
+    ALTER TABLE tracking_events
+    ADD CONSTRAINT tracking_events_event_type_check
+      CHECK (event_type IN (
+        'shipment_order_created',
+        'transport_planned_carrier_assigned',
+        'pickup_scheduled',
+        'truck_arrived_pickup',
+        'goods_loaded_pickup_confirmed',
+        'shipment_in_transit',
+        'departed_origin_terminal',
+        'in_transit_milestone',
+        'delay_logged',
+        'exception_logged',
+        'arrived_destination_terminal',
+        'out_for_delivery',
+        'truck_arrived_delivery',
+        'goods_delivered',
+        'pod_confirmed',
+        'shipment_completed_closed',
+        'location_updated',
+        'tracking_started',
+        'picked_up',
+        'checkpoint_reached',
+        'delayed',
+        'exception_reported',
+        'received'
+      ))
   `)
 
   await pool.query(`

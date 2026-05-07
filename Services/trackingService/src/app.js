@@ -8,7 +8,7 @@ app.use(express.json())
 
 app.get('/health', (req, res) => res.json({ status: 'ok', service: 'tracking-service' }))
 
-app.use('/tracking/shipments/:shipmentId', trackingRouter)
+app.use('/tracking/shipments/:shipmentNumber', trackingRouter)
 
 app.use((err, req, res, next) => {
   if (res.headersSent) return next(err)

@@ -12,9 +12,26 @@ function sendError(res, err) {
   })
 }
 
+function parseHistoryQuery(req, res) {
+  const parsedLimit = Number(req.query.limit || 100)
+  if (!Number.isInteger(parsedLimit) || parsedLimit < 1) {
+    res.status(400).json({ error: 'limit must be a positive integer' })
+    return null
+  }
+
+  return {
+    limit: Math.min(parsedLimit, 500),
+    order: req.query.order === 'desc' ? 'desc' : 'asc',
+  }
+}
+
+function shipmentReference(req) {
+  return req.params.shipmentNumber || req.params.shipmentId
+}
+
 router.get('/', async (req, res) => {
   try {
-    const summary = await TrackingEvent.summaryForShipment(req.params.shipmentId)
+    const summary = await TrackingEvent.summaryForShipment(shipmentReference(req))
     res.json(summary)
   } catch (err) {
     sendError(res, err)
@@ -23,8 +40,23 @@ router.get('/', async (req, res) => {
 
 router.get('/latest', async (req, res) => {
   try {
-    const summary = await TrackingEvent.summaryForShipment(req.params.shipmentId)
+    const summary = await TrackingEvent.summaryForShipment(shipmentReference(req))
     res.json(summary)
+  } catch (err) {
+    sendError(res, err)
+  }
+})
+
+router.get('/status', async (req, res) => {
+  try {
+    const options = parseHistoryQuery(req, res)
+    if (!options) return
+
+    const shipmentNumber = shipmentReference(req)
+    await verifyShipmentExists(shipmentNumber)
+
+    const statusHistory = await TrackingEvent.statusHistoryForShipment(shipmentNumber, options)
+    res.json(statusHistory)
   } catch (err) {
     sendError(res, err)
   }
@@ -32,14 +64,10 @@ router.get('/latest', async (req, res) => {
 
 router.get('/events', async (req, res) => {
   try {
-    const parsedLimit = Number(req.query.limit || 100)
-    if (!Number.isInteger(parsedLimit) || parsedLimit < 1) {
-      return res.status(400).json({ error: 'limit must be a positive integer' })
-    }
+    const options = parseHistoryQuery(req, res)
+    if (!options) return
 
-    const limit = Math.min(parsedLimit, 500)
-    const order = req.query.order === 'desc' ? 'desc' : 'asc'
-    const events = await TrackingEvent.listByShipment(req.params.shipmentId, { limit, order })
+    const events = await TrackingEvent.listByShipment(shipmentReference(req), options)
     res.json(events)
   } catch (err) {
     sendError(res, err)
@@ -48,13 +76,14 @@ router.get('/events', async (req, res) => {
 
 router.post('/events', async (req, res) => {
   try {
-    await verifyShipmentExists(req.params.shipmentId)
+    const shipmentNumber = shipmentReference(req)
+    await verifyShipmentExists(shipmentNumber)
 
-    const input = TrackingEvent.buildEventInput(req.params.shipmentId, req.body)
+    const input = TrackingEvent.buildEventInput(shipmentNumber, req.body)
     const { event, duplicate } = await TrackingEvent.create(input)
     const shipmentStatusSync = duplicate
       ? { status: 'skipped', reason: 'duplicate idempotencyKey' }
-      : await syncShipmentStatus(req.params.shipmentId, TrackingEvent.SYNC_STATUS_BY_EVENT[input.eventType])
+      : await syncShipmentStatus(shipmentNumber, TrackingEvent.SYNC_STATUS_BY_EVENT[input.eventType])
 
     res.status(201).json({ event, shipmentStatusSync })
   } catch (err) {
@@ -75,9 +104,10 @@ router.post('/location', async (req, res) => {
       idempotencyKey: req.body.idempotencyKey,
     }
 
-    await verifyShipmentExists(req.params.shipmentId)
+    const shipmentNumber = shipmentReference(req)
+    await verifyShipmentExists(shipmentNumber)
 
-    const input = TrackingEvent.buildEventInput(req.params.shipmentId, body)
+    const input = TrackingEvent.buildEventInput(shipmentNumber, body)
     const { event, duplicate } = await TrackingEvent.create(input)
 
     res.status(201).json({
