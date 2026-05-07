@@ -1,6 +1,4 @@
-const cors = require('cors')
-const express = require('express')
-const { createAuthRouter } = require('./login/auth.routes')
+const { createApp } = require('./app')
 const { createAuthService } = require('./login/auth.service')
 const { createJwtService } = require('./login/jwt.service')
 const { createUsersRepository } = require('./login/users.repository')
@@ -17,11 +15,10 @@ async function start() {
     secret: JWT_SECRET,
   })
   const authService = createAuthService({ jwtService, usersRepository })
-
-  const app = express()
-  app.use(cors({ origin: CORS_ORIGIN }))
-  app.use(express.json())
-  app.use('/auth', createAuthRouter(authService))
+  const app = createApp({
+    authService,
+    corsOrigin: CORS_ORIGIN,
+  })
 
   app.listen(PORT, () => {
     console.log(`Login service listening on ${PORT}`)
