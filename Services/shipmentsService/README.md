@@ -32,6 +32,6 @@ This file is automatically executed by MongoDB's init system when the container 
 ## Notes
 - MongoDB required (see `.env.example`).
 - All endpoints accept/return JSON.
+- Shipments can include an optional `estimatedArrivalAt` ISO timestamp. `notificationService` uses this field to detect delayed in-transit Shipments.
 - Nested routes allow managing goods/items within shipments.
 - Errors return JSON with `error` message.
-
