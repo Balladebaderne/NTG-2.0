@@ -14,6 +14,7 @@ db.shipments.insertMany([
     receiverCustomerId: "customer-1",
     createdByCustomerServiceId: "agent-1",
     status: "booked",
+    estimatedArrivalAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
     goods: [
       {
         totalWeightKG: 100,
@@ -30,6 +31,7 @@ db.shipments.insertMany([
     receiverCustomerId: "customer-2",
     createdByCustomerServiceId: "agent-2",
     status: "in_transit",
+    estimatedArrivalAt: new Date(Date.now() - 60 * 60 * 1000),
     goods: [
       {
         totalWeightKG: 200,
@@ -42,4 +44,3 @@ db.shipments.insertMany([
     ]
   }
 ]);
-

@@ -104,6 +104,40 @@ services:
       - driver_db_data:/var/lib/postgresql/data
       - ./Services/driverService/Database/init:/docker-entrypoint-initdb.d
 
+  notification-service:
+    build: ./Services/notificationService
+    environment:
+      - PORT=5002
+      - DATABASE_URL=postgres://postgres:postgres@notification_db:5432/notification_db
+      - SHIPMENTS_SERVICE_URL=http://shipments-service:5000
+      - DELAY_POLLING_ENABLED=true
+      - DELAY_POLLING_INTERVAL_MS=60000
+    depends_on:
+      - notification_db
+      - shipments-service
+    networks:
+      - web
+      - internal
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.notifications.rule=PathPrefix(`/notifications`)"
+      - "traefik.http.routers.notifications.entrypoints=web"
+      - "traefik.http.services.notifications.loadbalancer.server.port=5002"
+      - "traefik.docker.network=ntg_web"
+
+  notification_db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: notification_db
+    networks:
+      - internal
+    volumes:
+      - notification_db_data:/var/lib/postgresql/data
+      - ./Services/notificationService/Database/init:/docker-entrypoint-initdb.d
+
 volumes:
   shipments_db_data:
   driver_db_data:
+  notification_db_data:

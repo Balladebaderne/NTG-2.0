@@ -18,6 +18,16 @@ describe('Shipments API', () => {
       expect(res.body._id).toBeDefined()
     })
 
+    it('creates a shipment with an estimated arrival', async () => {
+      const estimatedArrivalAt = '2026-05-07T14:00:00.000Z'
+      const res = await request(app)
+        .post('/shipments')
+        .send({ ...validShipment, estimatedArrivalAt })
+
+      expect(res.status).toBe(201)
+      expect(res.body.estimatedArrivalAt).toBe(estimatedArrivalAt)
+    })
+
     it('returns 400 when required fields are missing', async () => {
       const res = await request(app).post('/shipments').send({})
       expect(res.status).toBe(400)
@@ -74,6 +84,26 @@ describe('Shipments API', () => {
       const res = await request(app).put(`/shipments/${created.body._id}`).send({ status: 'in_transit' })
       expect(res.status).toBe(200)
       expect(res.body.status).toBe('in_transit')
+    })
+
+    it('updates estimated arrival', async () => {
+      const created = await request(app).post('/shipments').send(validShipment)
+      const estimatedArrivalAt = '2026-05-07T15:30:00.000Z'
+      const res = await request(app)
+        .put(`/shipments/${created.body._id}`)
+        .send({ estimatedArrivalAt })
+
+      expect(res.status).toBe(200)
+      expect(res.body.estimatedArrivalAt).toBe(estimatedArrivalAt)
+    })
+
+    it('returns 400 for invalid estimated arrival', async () => {
+      const created = await request(app).post('/shipments').send(validShipment)
+      const res = await request(app)
+        .put(`/shipments/${created.body._id}`)
+        .send({ estimatedArrivalAt: 'not-a-date' })
+
+      expect(res.status).toBe(400)
     })
 
     it('returns 400 for invalid status', async () => {
