@@ -81,7 +81,8 @@ services:
       - PORT=5001
       - DATABASE_URL=postgres://postgres:postgres@driver_db:5432/driver_db
     depends_on:
-      - driver_db
+      driver_db:
+        condition: service_healthy
     networks:
       - web
       - internal
@@ -103,7 +104,50 @@ services:
     volumes:
       - driver_db_data:/var/lib/postgresql/data
       - ./Services/driverService/Database/init:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d driver_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  driver-loyalty-service:
+    build: ./Services/driverLoyaltyService/src
+    environment:
+      - PORT=5003
+      - DATABASE_URL=postgres://postgres:postgres@loyalty_db:5432/loyalty_db
+      - JWT_SECRET=local-login-secret-change-me
+    depends_on:
+      loyalty_db:
+        condition: service_healthy
+    networks:
+      - web
+      - internal
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.loyalty.rule=PathRegexp(`^/drivers/[^/]+/points$`)"
+      - "traefik.http.routers.loyalty.entrypoints=web"
+      - "traefik.http.routers.loyalty.priority=200"
+      - "traefik.http.services.loyalty.loadbalancer.server.port=5003"
+      - "traefik.docker.network=ntg_web"
+
+  loyalty_db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: loyalty_db
+    networks:
+      - internal
+    volumes:
+      - loyalty_db_data:/var/lib/postgresql/data
+      - ./Services/driverLoyaltyService/Database/init:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d loyalty_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
 volumes:
   shipments_db_data:
   driver_db_data:
+  loyalty_db_data:
