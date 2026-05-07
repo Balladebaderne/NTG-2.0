@@ -1,0 +1,34 @@
+[
+  {
+    "id": "usr_admin",
+    "name": "NTG Admin",
+    "email": "admin@ntg.local",
+    "password": "admin123",
+    "role": "admin",
+    "roleLabel": "Admin"
+  },
+  {
+    "id": "usr_driver",
+    "name": "NTG Driver",
+    "email": "driver@ntg.local",
+    "password": "driver123",
+    "role": "driver",
+    "roleLabel": "Driver"
+  },
+  {
+    "id": "usr_support",
+    "name": "NTG Support",
+    "email": "support@ntg.local",
+    "password": "support123",
+    "role": "support",
+    "roleLabel": "Customer Support"
+  },
+  {
+    "id": "usr_logistics",
+    "name": "NTG Logistics Manager",
+    "email": "logistics@ntg.local",
+    "password": "logistics123",
+    "role": "logistics",
+    "roleLabel": "Logistical Management"
+  }
+]

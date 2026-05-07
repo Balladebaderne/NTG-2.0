@@ -15,7 +15,7 @@ describe('Shipments API', () => {
       const res = await request(app).post('/shipments').send(validShipment)
       expect(res.status).toBe(201)
       expect(res.body.status).toBe('booked')
-      expect(res.body.shipmentId).toBeDefined()
+      expect(res.body._id).toBeDefined()
     })
 
     it('returns 400 when required fields are missing', async () => {
@@ -44,7 +44,7 @@ describe('Shipments API', () => {
 
     it('filters by status', async () => {
       const created = await request(app).post('/shipments').send(validShipment)
-      await request(app).put(`/shipments/${created.body.shipmentId}`).send({ status: 'in_transit' })
+      await request(app).put(`/shipments/${created.body._id}`).send({ status: 'in_transit' })
       await request(app).post('/shipments').send(validShipment)
 
       const res = await request(app).get('/shipments?status=in_transit')
@@ -55,11 +55,11 @@ describe('Shipments API', () => {
   })
 
   describe('GET /shipments/:id', () => {
-    it('returns a shipment by shipmentId', async () => {
+    it('returns a shipment by id', async () => {
       const created = await request(app).post('/shipments').send(validShipment)
-      const res = await request(app).get(`/shipments/${created.body.shipmentId}`)
+      const res = await request(app).get(`/shipments/${created.body._id}`)
       expect(res.status).toBe(200)
-      expect(res.body.shipmentId).toBe(created.body.shipmentId)
+      expect(res.body._id).toBe(created.body._id)
     })
 
     it('returns 404 for unknown id', async () => {
@@ -71,14 +71,14 @@ describe('Shipments API', () => {
   describe('PUT /shipments/:id', () => {
     it('updates status from booked to in_transit', async () => {
       const created = await request(app).post('/shipments').send(validShipment)
-      const res = await request(app).put(`/shipments/${created.body.shipmentId}`).send({ status: 'in_transit' })
+      const res = await request(app).put(`/shipments/${created.body._id}`).send({ status: 'in_transit' })
       expect(res.status).toBe(200)
       expect(res.body.status).toBe('in_transit')
     })
 
     it('returns 400 for invalid status', async () => {
       const created = await request(app).post('/shipments').send(validShipment)
-      const res = await request(app).put(`/shipments/${created.body.shipmentId}`).send({ status: 'lost' })
+      const res = await request(app).put(`/shipments/${created.body._id}`).send({ status: 'lost' })
       expect(res.status).toBe(400)
     })
 
@@ -91,9 +91,9 @@ describe('Shipments API', () => {
   describe('DELETE /shipments/:id', () => {
     it('deletes a shipment', async () => {
       const created = await request(app).post('/shipments').send(validShipment)
-      const res = await request(app).delete(`/shipments/${created.body.shipmentId}`)
+      const res = await request(app).delete(`/shipments/${created.body._id}`)
       expect(res.status).toBe(200)
-      const check = await request(app).get(`/shipments/${created.body.shipmentId}`)
+      const check = await request(app).get(`/shipments/${created.body._id}`)
       expect(check.status).toBe(404)
     })
 
