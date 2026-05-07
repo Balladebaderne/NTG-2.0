@@ -1,57 +1,141 @@
-version: '3.8'
+networks:
+  web:
+    name: ntg_web       # Public-facing: Traefik + routed services
+    driver: bridge
+  internal:
+    name: ntg_internal  # Private: databases only — no internet access
+    driver: bridge
+    internal: true
+
 services:
+  traefik:
+    image: traefik:v3.0
+    command:
+      - "--configFile=/etc/traefik/traefik.yml"
+    ports:
+      - "80:80"       # HTTP entrypoint — all API traffic
+      - "9090:8080"   # Dashboard (dev only)
+    networks:
+      - web
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+      - "./traefik/traefik.yml:/etc/traefik/traefik.yml:ro"
+
   frontend:
     build: ./frontend
-    ports:
-      - "3000:3000"
-    environment:
-      - REACT_APP_API_URL=http://localhost:8080
+    networks:
+      - web             # Only public network — cannot reach databases
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.frontend.rule=PathPrefix(`/`)"
+      - "traefik.http.routers.frontend.entrypoints=web"
+      - "traefik.http.services.frontend.loadbalancer.server.port=3000"
+      - "traefik.docker.network=ntg_web"
 
-  gateway:
-    build: ./gateway
-    ports:
-      - "8080:8080"
+  login-service:
+    build: ./Services/loginService
     environment:
-      - PORT=8080
-    depends_on:
-      - service-template
-      - shipments-service
-
-  service-template:
-    build: ./Services/service-template
-    environment:
-      - PORT=5000
-      - DATABASE_URL=postgres://postgres:postgres@service_template_db:5432/service_template_db
-    depends_on:
-      - service_template_db
-
-  service_template_db:
-    image: postgres:15-alpine
-    environment:
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
-      - POSTGRES_DB=service_template_db
-    ports:
-      - "5433:5432"
-    volumes:
-      - service_template_db_data:/var/lib/postgresql/data
+      - PORT=5001
+      - CORS_ORIGIN=http://localhost
+      - JWT_SECRET=local-login-secret-change-me
+      - JWT_EXPIRES_IN=1h
+    networks:
+      - web
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.auth.rule=PathPrefix(`/auth`)"
+      - "traefik.http.routers.auth.entrypoints=web"
+      - "traefik.http.routers.auth.priority=100"
+      - "traefik.http.services.auth.loadbalancer.server.port=5001"
+      - "traefik.docker.network=web"
 
   shipments-service:
     build: ./Services/shipmentsService
-    ports:
-      - "5001:5000"
     environment:
       - PORT=5000
       - MONGODB_URI=mongodb://shipments_db:27017/shipments_db
     depends_on:
       - shipments_db
+    networks:
+      - web             # Traefik routes inbound traffic here
+      - internal        # Service reaches shipments_db here
+    labels:
+      - "traefik.enable=true"
+      # Route /shipments (and nested /shipments/:id/goods, etc.) to this service
+      - "traefik.http.routers.shipments.rule=PathPrefix(`/shipments`)"
+      - "traefik.http.routers.shipments.entrypoints=web"
+      - "traefik.http.services.shipments.loadbalancer.server.port=5000"
+      - "traefik.docker.network=ntg_web"
 
   shipments_db:
     image: mongo:7
-    ports:
-      - "27017:27017"
+    networks:
+      - internal        # DB only on internal — not reachable from frontend or Traefik
     volumes:
       - shipments_db_data:/data/db
+      - ./Services/shipmentsService/Database/init:/docker-entrypoint-initdb.d
+
+  driver-service:
+    build: ./Services/driverService
+    environment:
+      - PORT=5001
+      - DATABASE_URL=postgres://postgres:postgres@driver_db:5432/driver_db
+    depends_on:
+      - driver_db
+    networks:
+      - web
+      - internal
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.drivers.rule=PathPrefix(`/drivers`)"
+      - "traefik.http.routers.drivers.entrypoints=web"
+      - "traefik.http.services.drivers.loadbalancer.server.port=5001"
+      - "traefik.docker.network=ntg_web"
+
+  driver_db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: driver_db
+    networks:
+      - internal
+    volumes:
+      - driver_db_data:/var/lib/postgresql/data
+      - ./Services/driverService/Database/init:/docker-entrypoint-initdb.d
+
+  notification-service:
+    build: ./Services/notificationService
+    environment:
+      - PORT=5002
+      - DATABASE_URL=postgres://postgres:postgres@notification_db:5432/notification_db
+      - SHIPMENTS_SERVICE_URL=http://shipments-service:5000
+      - DELAY_POLLING_ENABLED=true
+      - DELAY_POLLING_INTERVAL_MS=60000
+    depends_on:
+      - notification_db
+      - shipments-service
+    networks:
+      - web
+      - internal
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.notifications.rule=PathPrefix(`/notifications`)"
+      - "traefik.http.routers.notifications.entrypoints=web"
+      - "traefik.http.services.notifications.loadbalancer.server.port=5002"
+      - "traefik.docker.network=ntg_web"
+
+  notification_db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: notification_db
+    networks:
+      - internal
+    volumes:
+      - notification_db_data:/var/lib/postgresql/data
+      - ./Services/notificationService/Database/init:/docker-entrypoint-initdb.d
 
   sender-service:
     build: ./Services/senderService
@@ -93,7 +177,6 @@ services:
       - ai_chat_db_data:/data/db
 
 volumes:
-  service_template_db_data:
   shipments_db_data:
   sender_db_data:
   ai_chat_db_data:

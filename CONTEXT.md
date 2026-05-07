@@ -25,20 +25,43 @@ The party that receives the Goods at the destination.
 _Avoid_: Recipient, consignee, buyer, customer (without qualifier)
 
 **Driver**:
-The truck driver responsible for picking up and transporting a Shipment.
+The truck driver responsible for picking up and transporting a Shipment. An independent agent who registers in the system, logs in, and toggles their availability. Assignment to a Shipment is done by a **CustomerSupportAgent**.
 _Avoid_: Courier, carrier, transporter
 
+**DriverAvailability**:
+A Driver's self-reported readiness to accept Shipment assignments. A Driver is either available or unavailable. CustomerSupportAgents assign Shipments from the pool of available Drivers.
+_Avoid_: Status, online, active
+
 **Route**:
-The planned path a Driver follows to fulfil one or more Shipments.
-_Avoid_: Trip, journey, path
+A customer-facing visualization of the path a Shipment will travel, exposed to CustomerService and CustomerSupportService. Not used by the Driver to navigate — Drivers use their own external routing system (out of scope).
+_Avoid_: Trip, journey, path, driver assignment
+
+**EstimatedArrival**:
+The time NTG expects a Shipment to arrive at the ReceiverCustomer.
+_Avoid_: ETA (without defining it), delivery time, route time
+
+**Delay**:
+A Shipment condition where the Shipment is no longer expected to arrive when the ReceiverCustomer was told to expect it.
+_Avoid_: Late status, problem, exception
+
+**Notification**:
+A customer-facing message sent to a ReceiverCustomer about a Shipment that needs their attention.
+_Avoid_: Alert, email, message (without qualifier)
+
+**CustomerSupportAgent**:
+A platform operator who books Shipments on behalf of Senders and ReceiverCustomers, and assigns available Drivers to unassigned Shipments.
+_Avoid_: Operator, admin, dispatcher
 
 ## Relationships
 
 - A **Shipment** is created by a **CustomerSupportAgent** on behalf of a **Sender** and a **ReceiverCustomer**
 - A **Shipment** contains one or more **Goods**
 - A **Goods** contains one or more **Items**
-- A **Shipment** is assigned to a **Route**
-- A **Driver** is assigned to a **Route**
+- A **Route** is associated with a **Shipment** for customer-facing visualization
+- A **Driver** is assigned directly to a **Shipment** (not through a Route)
+- A **Shipment** has zero or one **EstimatedArrival**
+- A **Delay** belongs to one **Shipment**
+- A **Notification** is sent to one **ReceiverCustomer** about one **Shipment**
 
 ## Shipment lifecycle
 
@@ -50,10 +73,11 @@ _Avoid_: Trip, journey, path
 
 ## Example dialogue
 
-> **Dev:** "When a Sender books a Shipment, do we assign a Driver immediately?"
-> **Domain expert:** "No — the Shipment is booked first. A Route is assigned separately, and the Driver is associated with the Route, not directly with the Shipment."
+> **Dev:** "When a Driver marks themselves available, do they get assigned automatically?"
+> **Domain expert:** "No — a Driver toggles their DriverAvailability. A CustomerSupportAgent then picks an available Driver and assigns them directly to a Shipment. The Route on a Shipment is for customer visualization only — it has nothing to do with the Driver assignment."
 
 ## Flagged ambiguities
 
 - "customer" was used to mean both Sender and ReceiverCustomer — resolved: these are distinct roles. Use **Sender** for the originating party and **ReceiverCustomer** for the destination party.
 - "items" was initially used to mean the goods inside a Shipment — resolved: **Item** is the leaf-level entity, **Goods** is the grouping, **Shipment** is the top-level wrapper.
+- "Route" was initially defined as the path a Driver follows — resolved: **Route** is a customer-facing visualization concept only. Drivers use their own external navigation (out of scope). A Driver is assigned directly to a **Shipment**, not through a Route.
