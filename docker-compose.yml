@@ -104,6 +104,79 @@ services:
       - driver_db_data:/var/lib/postgresql/data
       - ./Services/driverService/Database/init:/docker-entrypoint-initdb.d
 
+  notification-service:
+    build: ./Services/notificationService
+    environment:
+      - PORT=5002
+      - DATABASE_URL=postgres://postgres:postgres@notification_db:5432/notification_db
+      - SHIPMENTS_SERVICE_URL=http://shipments-service:5000
+      - DELAY_POLLING_ENABLED=true
+      - DELAY_POLLING_INTERVAL_MS=60000
+    depends_on:
+      - notification_db
+      - shipments-service
+    networks:
+      - web
+      - internal
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.notifications.rule=PathPrefix(`/notifications`)"
+      - "traefik.http.routers.notifications.entrypoints=web"
+      - "traefik.http.services.notifications.loadbalancer.server.port=5002"
+      - "traefik.docker.network=ntg_web"
+
+  notification_db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: notification_db
+    networks:
+      - internal
+    volumes:
+      - notification_db_data:/var/lib/postgresql/data
+      - ./Services/notificationService/Database/init:/docker-entrypoint-initdb.d
+
+  sender-service:
+    build: ./Services/senderService
+    ports:
+      - "5006:5003"
+    environment:
+      - PORT=5003
+      - MONGODB_URI=mongodb://sender_db:27017/sender_db
+      - SHIPMENTS_URL=http://shipments-service:5000
+    depends_on:
+      - sender_db
+      - shipments-service
+
+  sender_db:
+    image: mongo:7
+    ports:
+      - "27020:27017"
+    volumes:
+      - sender_db_data:/data/db
+
+  ai-chat-service:
+    build: ./Services/aiChatService
+    ports:
+      - "5007:5004"
+    environment:
+      - PORT=5004
+      - MONGODB_URI=mongodb://ai_chat_db:27017/ai_chat_db
+      - SHIPMENTS_URL=http://shipments-service:5000
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+    depends_on:
+      - ai_chat_db
+      - shipments-service
+
+  ai_chat_db:
+    image: mongo:7
+    ports:
+      - "27021:27017"
+    volumes:
+      - ai_chat_db_data:/data/db
+
 volumes:
   shipments_db_data:
-  driver_db_data:
+  sender_db_data:
+  ai_chat_db_data:
