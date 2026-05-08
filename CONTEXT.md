@@ -52,6 +52,14 @@ _Avoid_: Alert, email, message (without qualifier)
 A platform operator who books Shipments on behalf of Senders and ReceiverCustomers, and assigns available Drivers to unassigned Shipments.
 _Avoid_: Operator, admin, dispatcher
 
+**LoyaltyPoints**:
+A Driver's accumulated score on the platform, earned by delivering Shipments and reporting intermediate tracking events. Stored as a running total per Driver. A Driver can only view their own LoyaltyPoints; admin and support roles can view any Driver's total.
+_Avoid_: Reward points, credits, score
+
+**IntermediateEvent**:
+A Shipment status change that is not the final delivery (i.e. not `received`), used as a trigger for awarding a smaller number of LoyaltyPoints to the assigned Driver. Originates from the trackingService via the message broker.
+_Avoid_: Status update, tracking event, partial event
+
 ## Relationships
 
 - A **Shipment** is created by a **CustomerSupportAgent** on behalf of a **Sender** and a **ReceiverCustomer**

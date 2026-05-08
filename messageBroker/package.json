@@ -1,0 +1,13 @@
+{
+  "name": "message-broker",
+  "version": "1.0.0",
+  "description": "RabbitMQ broker service for NTG",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js"
+  },
+  "dependencies": {
+    "amqplib": "^0.10.4",
+    "express": "^4.19.2"
+  }
+}
