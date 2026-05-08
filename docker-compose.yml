@@ -398,10 +398,12 @@ services:
       - "traefik.enable=true"
       - "traefik.http.routers.chat.rule=PathPrefix(`/chat`)"
       - "traefik.http.routers.chat.entrypoints=web"
+      - "traefik.http.routers.chat.service=chat"
       - "traefik.http.services.chat.loadbalancer.server.port=5004"
       - "traefik.docker.network=ntg_web"
       - "traefik.http.routers.conversations.rule=PathPrefix(`/conversations`)"
       - "traefik.http.routers.conversations.entrypoints=web"
+      - "traefik.http.routers.conversations.service=conversations"
       - "traefik.http.services.conversations.loadbalancer.server.port=5004"
     healthcheck:
       test: ["CMD-SHELL", "node -e \"fetch('http://localhost:5004/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
@@ -465,10 +467,12 @@ services:
       - "traefik.enable=true"
       - "traefik.http.routers.tickets.rule=PathPrefix(`/tickets`)"
       - "traefik.http.routers.tickets.entrypoints=web"
+      - "traefik.http.routers.tickets.service=tickets"
       - "traefik.http.services.tickets.loadbalancer.server.port=5002"
       - "traefik.docker.network=ntg_web"
       - "traefik.http.routers.search.rule=PathPrefix(`/search`)"
       - "traefik.http.routers.search.entrypoints=web"
+      - "traefik.http.routers.search.service=search"
       - "traefik.http.services.search.loadbalancer.server.port=5002"
     healthcheck:
       test: ["CMD-SHELL", "node -e \"fetch('http://localhost:5002/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
