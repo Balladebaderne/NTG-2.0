@@ -1,7 +1,9 @@
 const express = require('express')
 
 const TrackingEvent = require('../models/TrackingEvent')
+const { requireWriteAuth } = require('../middleware/requireWriteAuth')
 const { syncShipmentStatus, verifyShipmentExists } = require('../services/shipmentsClient')
+const { publishTrackingEvent } = require('../services/trackingEventsPublisher')
 
 const router = express.Router({ mergeParams: true })
 
@@ -74,7 +76,7 @@ router.get('/events', async (req, res) => {
   }
 })
 
-router.post('/events', async (req, res) => {
+router.post('/events', requireWriteAuth, async (req, res) => {
   try {
     const shipmentNumber = shipmentReference(req)
     await verifyShipmentExists(shipmentNumber)
@@ -84,18 +86,20 @@ router.post('/events', async (req, res) => {
     const shipmentStatusSync = duplicate
       ? { status: 'skipped', reason: 'duplicate idempotencyKey' }
       : await syncShipmentStatus(shipmentNumber, TrackingEvent.SYNC_STATUS_BY_EVENT[input.eventType])
+    const trackingEventPublish = duplicate
+      ? { status: 'skipped', reason: 'duplicate idempotencyKey' }
+      : await publishTrackingEvent(event)
 
-    res.status(201).json({ event, shipmentStatusSync })
+    res.status(201).json({ event, shipmentStatusSync, trackingEventPublish })
   } catch (err) {
     sendError(res, err)
   }
 })
 
-router.post('/location', async (req, res) => {
+router.post('/location', requireWriteAuth, async (req, res) => {
   try {
     const body = {
       eventType: 'location_updated',
-      status: 'in_transit',
       occurredAt: req.body.occurredAt,
       location: req.body.location,
       routeId: req.body.routeId,

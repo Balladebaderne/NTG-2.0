@@ -1,5 +1,6 @@
 const express = require('express')
 
+const { requireWriteAuth } = require('../middleware/requireWriteAuth')
 const RoutePlan = require('../models/RoutePlan')
 const { enrichRouteInput } = require('../services/routeCalculation')
 const { syncShipmentRoute, verifyShipmentExists } = require('../services/shipmentsClient')
@@ -57,7 +58,7 @@ router.get('/:routeId', async (req, res) => {
   }
 })
 
-router.post('/', async (req, res) => {
+router.post('/', requireWriteAuth, async (req, res) => {
   try {
     const input = RoutePlan.buildRouteInput(req.body)
     await verifyShipmentExists(input.shipmentId)
@@ -72,7 +73,7 @@ router.post('/', async (req, res) => {
   }
 })
 
-router.put('/:routeId', async (req, res) => {
+router.put('/:routeId', requireWriteAuth, async (req, res) => {
   try {
     const input = RoutePlan.buildRouteInput(req.body, req.params.routeId)
     await verifyShipmentExists(input.shipmentId)
@@ -89,7 +90,7 @@ router.put('/:routeId', async (req, res) => {
   }
 })
 
-router.delete('/:routeId', async (req, res) => {
+router.delete('/:routeId', requireWriteAuth, async (req, res) => {
   try {
     const route = await RoutePlan.findById(req.params.routeId)
     if (!route) return res.status(404).json({ error: 'Route not found' })

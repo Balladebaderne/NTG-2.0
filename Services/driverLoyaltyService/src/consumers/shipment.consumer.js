@@ -1,13 +1,4 @@
-// Stub: will consume shipment status-change events from the message broker.
-//
-// When wired up, this consumer handles two event types:
-//   - "delivered"          → addPoints(driverId, 50)
-//   - "intermediate_event" → addPoints(driverId, 10)
-//
-// Expected event shape:
-//   { type: "delivered" | "intermediate_event", driverId: string, shipmentId: string }
-
-const { addPoints } = require('../db')
+const { addPoints, addPointsForEvent } = require('../db')
 
 const POINT_VALUES = {
   delivered: 50,
@@ -17,8 +8,16 @@ const POINT_VALUES = {
 async function handleShipmentEvent(event) {
   const { type, driverId } = event
   const amount = POINT_VALUES[type]
-  if (!amount || !driverId) return
+  const eventId = event.eventId || event.trackingEventId || event.idempotencyKey
+
+  if (!amount || !driverId) return { status: 'skipped' }
+
+  if (eventId) {
+    return addPointsForEvent(driverId, amount, eventId, type)
+  }
+
   await addPoints(driverId, amount)
+  return { awarded: true, pointsAwarded: amount }
 }
 
 module.exports = { handleShipmentEvent, POINT_VALUES }

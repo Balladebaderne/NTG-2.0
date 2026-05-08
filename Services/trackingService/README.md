@@ -145,7 +145,7 @@ Convenience endpoint for GPS/location pings:
 POST /tracking/shipments/:shipmentNumber/location
 ```
 
-Internally this creates a `location_updated` tracking event. It does not advance the operational milestone flow.
+Internally this creates a `location_updated` tracking event. It does not advance the operational milestone flow and does not set or sync the coarse Shipment lifecycle status.
 
 ### List Events
 

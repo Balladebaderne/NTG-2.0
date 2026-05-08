@@ -19,9 +19,16 @@ All app and API traffic enters through Traefik on **port 80**. Routes are define
 | `/auth` | `login-service` |
 | `/shipments` | `shipments-service` |
 | `/tracking` | `tracking-service` |
+| `/routes` | `route-service` |
 | `/drivers` | `driver-service` |
+| `/drivers/:id/points` | `driver-loyalty-service` |
 | `/notifications` | `notification-service` |
-| `/items` | `service-template` |
+| `/senders` | `sender-service` |
+| `/customers` | `customer-service` |
+| `/tickets` | `customer-support-service` |
+| `/search` | `customer-support-service` |
+| `/chat` | `ai-chat-service` |
+| `/conversations` | `ai-chat-service` |
 
 **App**: http://localhost
 **Dashboard**: http://localhost:9090 (dev only — do not expose in production)

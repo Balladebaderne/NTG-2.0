@@ -1,7 +1,11 @@
 const TrackingEvent = require('../models/TrackingEvent')
+const {
+  BROKER_EVENT_BY_TRACKING_EVENT,
+  brokerEventFromTrackingEvent,
+} = require('../services/trackingEventsPublisher')
 
 describe('TrackingEvent model input', () => {
-  it('builds a location update with in_transit status', () => {
+  it('builds a location update without changing lifecycle status', () => {
     const input = TrackingEvent.buildEventInput('shipment-1', {
       eventType: 'location_updated',
       location: {
@@ -13,7 +17,7 @@ describe('TrackingEvent model input', () => {
 
     expect(input.shipmentId).toBe('shipment-1')
     expect(input.eventType).toBe('location_updated')
-    expect(input.status).toBe('in_transit')
+    expect(input.status).toBeNull()
     expect(input.latitude).toBe(55.6761)
     expect(input.longitude).toBe(12.5683)
     expect(input.locationLabel).toBe('Copenhagen')
@@ -96,5 +100,40 @@ describe('TrackingEvent model input', () => {
         { eventType: 'exception_logged' }
       )
     ).toThrow('Shipment tracking flow is already completed and closed')
+  })
+})
+
+describe('tracking event broker mapping', () => {
+  it('maps delivered lifecycle events to broker delivered events', () => {
+    const event = brokerEventFromTrackingEvent({
+      canonicalEventType: 'goods_delivered',
+      driverId: 'driver-1',
+      trackingEventId: 'event-1',
+      shipmentId: 'shipment-1',
+      occurredAt: '2026-05-08T10:00:00.000Z',
+    })
+
+    expect(event).toMatchObject({
+      type: 'delivered',
+      eventId: 'event-1',
+      driverId: 'driver-1',
+      shipmentId: 'shipment-1',
+      trackingEventType: 'goods_delivered',
+    })
+  })
+
+  it('maps route milestone events to broker intermediate events', () => {
+    expect(BROKER_EVENT_BY_TRACKING_EVENT.out_for_delivery).toBe('intermediate_event')
+    expect(BROKER_EVENT_BY_TRACKING_EVENT.in_transit_milestone).toBe('intermediate_event')
+  })
+
+  it('does not publish events that have no driver assignment', () => {
+    const event = brokerEventFromTrackingEvent({
+      canonicalEventType: 'goods_delivered',
+      trackingEventId: 'event-1',
+      shipmentId: 'shipment-1',
+    })
+
+    expect(event).toBeNull()
   })
 })

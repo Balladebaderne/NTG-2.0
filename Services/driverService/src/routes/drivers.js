@@ -1,6 +1,7 @@
 const express = require('express')
 const router = express.Router()
 const pool = require('../db')
+const { requireWriteAuth } = require('../middleware/requireWriteAuth')
 
 // GET /drivers — list all, optionally filter by availability
 router.get('/', async (req, res) => {
@@ -72,7 +73,7 @@ router.put('/:id', async (req, res) => {
 })
 
 // PATCH /drivers/:id/availability — toggle DriverAvailability
-router.patch('/:id/availability', async (req, res) => {
+router.patch('/:id/availability', requireWriteAuth, async (req, res) => {
   const { available } = req.body
   if (typeof available !== 'boolean') {
     return res.status(400).json({ error: '"available" must be a boolean' })

@@ -20,6 +20,7 @@ const ShipmentSchema = new mongoose.Schema({
   senderId:                  { type: String, required: true },
   receiverCustomerId:        { type: String, required: true },
   createdByCustomerServiceId:{ type: String, required: true },
+  driverId:                  { type: String, default: null },
   routeId:                   { type: String, default: null },
   estimatedArrivalAt:        { type: Date, default: null },
   goods:                     { type: [GoodsSchema], default: [] },

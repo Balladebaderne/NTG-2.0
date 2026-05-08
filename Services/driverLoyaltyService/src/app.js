@@ -4,6 +4,11 @@ const pointsRouter = require('./routes/points.routes')
 function createApp() {
   const app = express()
   app.use(express.json())
+
+  app.get('/health', (req, res) => {
+    res.json({ status: 'ok', service: 'driver-loyalty-service' })
+  })
+
   app.use(pointsRouter)
 
   // Global error handler

@@ -12,6 +12,7 @@ Handles user authentication and issues JWT tokens for the NTG platform.
 
 | Method | Path | Description |
 |--------|------|-------------|
+| `GET` | `/health` | Service health check |
 | `POST` | `/auth/login` | Authenticate and receive a JWT |
 
 ### POST `/auth/login`

@@ -113,7 +113,7 @@ const EVENT_DEFINITIONS = {
   // the operational milestone flow.
   location_updated: {
     label: 'Location updated',
-    shipmentStatus: 'in_transit',
+    shipmentStatus: null,
     sideEvent: true,
     minOrder: 50,
   },

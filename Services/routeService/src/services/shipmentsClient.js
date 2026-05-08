@@ -16,6 +16,14 @@ async function fetchWithTimeout(url, options = {}) {
   }
 }
 
+function serviceHeaders(extraHeaders = {}) {
+  const serviceToken = process.env.SERVICE_AUTH_TOKEN
+  return {
+    ...extraHeaders,
+    ...(serviceToken ? { 'x-service-token': serviceToken } : {}),
+  }
+}
+
 async function verifyShipmentExists(shipmentId) {
   if (!verifyShipments) return
 
@@ -59,7 +67,7 @@ async function syncShipmentRoute(shipmentId, routePatch) {
     const encodedShipmentId = encodeURIComponent(shipmentId)
     const response = await fetchWithTimeout(`${shipmentsServiceUrl}/shipments/${encodedShipmentId}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: serviceHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify(payload),
     })
 

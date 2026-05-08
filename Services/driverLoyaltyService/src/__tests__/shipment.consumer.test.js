@@ -1,9 +1,10 @@
 jest.mock('../db')
-const { addPoints } = require('../db')
+const { addPoints, addPointsForEvent } = require('../db')
 const { handleShipmentEvent, POINT_VALUES } = require('../consumers/shipment.consumer')
 
 beforeEach(() => {
   addPoints.mockResolvedValue()
+  addPointsForEvent.mockResolvedValue({ awarded: true, pointsAwarded: 50 })
 })
 
 afterEach(() => {
@@ -19,6 +20,18 @@ describe('handleShipmentEvent', () => {
   it('awards 10 points for an intermediate_event', async () => {
     await handleShipmentEvent({ type: 'intermediate_event', driverId: 'usr_driver', shipmentId: 'shp_1' })
     expect(addPoints).toHaveBeenCalledWith('usr_driver', 10)
+  })
+
+  it('uses idempotent event awards when an event id is present', async () => {
+    await handleShipmentEvent({
+      type: 'delivered',
+      driverId: 'usr_driver',
+      shipmentId: 'shp_1',
+      trackingEventId: 'event-1',
+    })
+
+    expect(addPointsForEvent).toHaveBeenCalledWith('usr_driver', 50, 'event-1', 'delivered')
+    expect(addPoints).not.toHaveBeenCalled()
   })
 
   it('does nothing for an unknown event type', async () => {

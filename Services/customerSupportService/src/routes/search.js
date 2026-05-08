@@ -27,12 +27,22 @@ router.get('/shipments', async (req, res) => {
       return res.status(400).json({ error: 'At least one of "destination" or "reference" is required' })
     }
 
-    const params = {}
-    if (destination) params.destination = destination
-    if (reference)   params.reference = reference
+    const { data } = await axios.get(`${SHIPMENTS_URL}/shipments`)
+    const destinationQuery = String(destination || '').toLowerCase()
+    const referenceQuery = String(reference || '').toLowerCase()
 
-    const { data } = await axios.get(`${SHIPMENTS_URL}/shipments`, { params })
-    res.json(data)
+    const shipments = data.filter((shipment) => {
+      const text = JSON.stringify(shipment).toLowerCase()
+      const matchesDestination = destinationQuery ? text.includes(destinationQuery) : true
+      const matchesReference = referenceQuery
+        ? String(shipment._id || shipment.id || shipment.shipmentId || '').toLowerCase().includes(referenceQuery)
+          || text.includes(referenceQuery)
+        : true
+
+      return matchesDestination && matchesReference
+    })
+
+    res.json(shipments)
   } catch (err) {
     res.status(502).json({ error: 'Could not reach shipments service', details: err.message })
   }

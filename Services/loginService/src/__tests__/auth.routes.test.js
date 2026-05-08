@@ -9,6 +9,19 @@ function createTestApp({ authService }) {
 }
 
 describe('Auth routes', () => {
+  describe('GET /health', () => {
+    it('returns service health', async () => {
+      const app = createTestApp({
+        authService: { login: jest.fn() },
+      })
+
+      const res = await request(app).get('/health')
+
+      expect(res.status).toBe(200)
+      expect(res.body).toEqual({ status: 'ok', service: 'login-service' })
+    })
+  })
+
   describe('POST /auth/login', () => {
     it('returns a token for valid credentials', async () => {
       const authService = {

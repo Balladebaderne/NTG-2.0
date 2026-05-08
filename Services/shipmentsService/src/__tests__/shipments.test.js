@@ -28,6 +28,13 @@ describe('Shipments API', () => {
       expect(res.body.estimatedArrivalAt).toBe(estimatedArrivalAt)
     })
 
+    it('creates a shipment without a driver assignment by default', async () => {
+      const res = await request(app).post('/shipments').send(validShipment)
+
+      expect(res.status).toBe(201)
+      expect(res.body.driverId).toBeNull()
+    })
+
     it('returns 400 when required fields are missing', async () => {
       const res = await request(app).post('/shipments').send({})
       expect(res.status).toBe(400)
@@ -52,6 +59,28 @@ describe('Shipments API', () => {
       expect(res.body[0].receiverCustomerId).toBe('customer-2')
     })
 
+    it('filters by receiverCustomerId', async () => {
+      await request(app).post('/shipments').send(validShipment)
+      await request(app).post('/shipments').send({ ...validShipment, receiverCustomerId: 'customer-2' })
+
+      const res = await request(app).get('/shipments?receiverCustomerId=customer-2')
+
+      expect(res.status).toBe(200)
+      expect(res.body.length).toBe(1)
+      expect(res.body[0].receiverCustomerId).toBe('customer-2')
+    })
+
+    it('filters by senderId', async () => {
+      await request(app).post('/shipments').send(validShipment)
+      await request(app).post('/shipments').send({ ...validShipment, senderId: 'sender-2' })
+
+      const res = await request(app).get('/shipments?senderId=sender-2')
+
+      expect(res.status).toBe(200)
+      expect(res.body.length).toBe(1)
+      expect(res.body[0].senderId).toBe('sender-2')
+    })
+
     it('filters by status', async () => {
       const created = await request(app).post('/shipments').send(validShipment)
       await request(app).put(`/shipments/${created.body._id}`).send({ status: 'in_transit' })
@@ -61,6 +90,30 @@ describe('Shipments API', () => {
       expect(res.status).toBe(200)
       expect(res.body.length).toBe(1)
       expect(res.body[0].status).toBe('in_transit')
+    })
+
+    it('filters by routeId', async () => {
+      const created = await request(app).post('/shipments').send(validShipment)
+      await request(app).put(`/shipments/${created.body._id}`).send({ routeId: 'route-1' })
+      await request(app).post('/shipments').send(validShipment)
+
+      const res = await request(app).get('/shipments?routeId=route-1')
+
+      expect(res.status).toBe(200)
+      expect(res.body.length).toBe(1)
+      expect(res.body[0].routeId).toBe('route-1')
+    })
+
+    it('filters by driverId', async () => {
+      const created = await request(app).post('/shipments').send(validShipment)
+      await request(app).put(`/shipments/${created.body._id}`).send({ driverId: 'driver-uuid-1' })
+      await request(app).post('/shipments').send(validShipment)
+
+      const res = await request(app).get('/shipments?driverId=driver-uuid-1')
+
+      expect(res.status).toBe(200)
+      expect(res.body.length).toBe(1)
+      expect(res.body[0].driverId).toBe('driver-uuid-1')
     })
   })
 
@@ -95,6 +148,16 @@ describe('Shipments API', () => {
 
       expect(res.status).toBe(200)
       expect(res.body.estimatedArrivalAt).toBe(estimatedArrivalAt)
+    })
+
+    it('assigns a driver by driverService id', async () => {
+      const created = await request(app).post('/shipments').send(validShipment)
+      const res = await request(app)
+        .put(`/shipments/${created.body._id}`)
+        .send({ driverId: 'driver-uuid-1' })
+
+      expect(res.status).toBe(200)
+      expect(res.body.driverId).toBe('driver-uuid-1')
     })
 
     it('returns 400 for invalid estimated arrival', async () => {

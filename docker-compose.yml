@@ -43,6 +43,11 @@ services:
         condition: service_healthy
     networks:
       - broker
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://localhost:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 10s
+      timeout: 5s
+      retries: 10
 
 
   traefik:
@@ -84,7 +89,12 @@ services:
       - "traefik.http.routers.auth.entrypoints=web"
       - "traefik.http.routers.auth.priority=100"
       - "traefik.http.services.auth.loadbalancer.server.port=5001"
-      - "traefik.docker.network=web"
+      - "traefik.docker.network=ntg_web"
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://localhost:5001/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 10s
+      timeout: 5s
+      retries: 10
 
   shipments-service:
     build: ./Services/shipmentsService
@@ -103,6 +113,11 @@ services:
       - "traefik.http.routers.shipments.entrypoints=web"
       - "traefik.http.services.shipments.loadbalancer.server.port=5000"
       - "traefik.docker.network=ntg_web"
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://localhost:5000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 10s
+      timeout: 5s
+      retries: 10
 
   shipments_db:
     image: mongo:7
@@ -121,17 +136,29 @@ services:
       - VERIFY_SHIPMENTS=true
       - SHIPMENT_STATUS_SYNC_ENABLED=true
       - HTTP_TIMEOUT_SECONDS=3
+      - TRACKING_EVENT_PUBLISHING_ENABLED=true
+      - TRACKING_EVENTS_EXCHANGE=tracking.events
+      - RABBITMQ_HOST=rabbitmq
+      - RABBITMQ_PORT=5672
+      - RABBITMQ_USER=guest
+      - RABBITMQ_PASS=guest
     depends_on:
       - tracking_db
     networks:
       - web
       - internal
+      - broker
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.tracking.rule=PathPrefix(`/tracking`)"
       - "traefik.http.routers.tracking.entrypoints=web"
       - "traefik.http.services.tracking.loadbalancer.server.port=5000"
       - "traefik.docker.network=ntg_web"
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://localhost:5000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 10s
+      timeout: 5s
+      retries: 10
 
   tracking_db:
     image: postgres:16-alpine
@@ -143,6 +170,47 @@ services:
       - internal
     volumes:
       - tracking_db_data:/var/lib/postgresql/data
+
+  route-service:
+    build: ./Services/routeService
+    environment:
+      - PORT=5000
+      - DATABASE_URL=postgres://postgres:postgres@route_db:5432/route_db
+      - SHIPMENTS_SERVICE_URL=http://shipments-service:5000
+      - VERIFY_SHIPMENTS=true
+      - SHIPMENT_ROUTE_SYNC_ENABLED=true
+      - HTTP_TIMEOUT_SECONDS=3
+      - GOOGLE_MAPS_API_KEY=${GOOGLE_MAPS_API_KEY:-AIzaSyCfVQgCV8rQjV4EjnkevYoae4hFjyZ4SL0}
+      - ROUTE_CALCULATION_PROVIDER=google
+      - ROUTE_CALCULATION_REQUIRED=false
+    depends_on:
+      - route_db
+      - shipments-service
+    networks:
+      - web
+      - internal
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.routes.rule=PathPrefix(`/routes`)"
+      - "traefik.http.routers.routes.entrypoints=web"
+      - "traefik.http.services.routes.loadbalancer.server.port=5000"
+      - "traefik.docker.network=ntg_web"
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://localhost:5000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  route_db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: route_db
+    networks:
+      - internal
+    volumes:
+      - route_db_data:/var/lib/postgresql/data
 
   driver-service:
     build: ./Services/driverService
@@ -161,6 +229,11 @@ services:
       - "traefik.http.routers.drivers.entrypoints=web"
       - "traefik.http.services.drivers.loadbalancer.server.port=5001"
       - "traefik.docker.network=ntg_web"
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://localhost:5001/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 10s
+      timeout: 5s
+      retries: 10
 
   driver_db:
     image: postgres:16-alpine
@@ -185,12 +258,22 @@ services:
       - PORT=5003
       - DATABASE_URL=postgres://postgres:postgres@loyalty_db:5432/loyalty_db
       - JWT_SECRET=local-login-secret-change-me
+      - LOYALTY_EVENT_CONSUMER_ENABLED=true
+      - TRACKING_EVENTS_EXCHANGE=tracking.events
+      - LOYALTY_EVENTS_QUEUE=driver-loyalty.tracking-events
+      - RABBITMQ_HOST=rabbitmq
+      - RABBITMQ_PORT=5672
+      - RABBITMQ_USER=guest
+      - RABBITMQ_PASS=guest
     depends_on:
       loyalty_db:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
     networks:
       - web
       - internal
+      - broker
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.loyalty.rule=PathRegexp(`^/drivers/[^/]+/points$`)"
@@ -198,6 +281,11 @@ services:
       - "traefik.http.routers.loyalty.priority=200"
       - "traefik.http.services.loyalty.loadbalancer.server.port=5003"
       - "traefik.docker.network=ntg_web"
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://localhost:5003/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 10s
+      timeout: 5s
+      retries: 10
 
   loyalty_db:
     image: postgres:16-alpine
@@ -236,6 +324,11 @@ services:
       - "traefik.http.routers.notifications.entrypoints=web"
       - "traefik.http.services.notifications.loadbalancer.server.port=5002"
       - "traefik.docker.network=ntg_web"
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://localhost:5002/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 10s
+      timeout: 5s
+      retries: 10
 
   notification_db:
     image: postgres:16-alpine
@@ -252,45 +345,153 @@ services:
   sender-service:
     build: ./Services/senderService
     ports:
-      - "5006:5003"
+      - "5006:5003" # Dev-only convenience; Traefik is the primary access path.
     environment:
       - PORT=5003
       - MONGODB_URI=mongodb://sender_db:27017/sender_db
+      - SHIPMENTS_SERVICE_URL=http://shipments-service:5000
       - SHIPMENTS_URL=http://shipments-service:5000
     depends_on:
       - sender_db
       - shipments-service
+    networks:
+      - web
+      - internal
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.senders.rule=PathPrefix(`/senders`)"
+      - "traefik.http.routers.senders.entrypoints=web"
+      - "traefik.http.services.senders.loadbalancer.server.port=5003"
+      - "traefik.docker.network=ntg_web"
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://localhost:5003/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 10s
+      timeout: 5s
+      retries: 10
 
   sender_db:
     image: mongo:7
     ports:
-      - "27020:27017"
+      - "27020:27017" # Dev-only convenience.
+    networks:
+      - internal
     volumes:
       - sender_db_data:/data/db
 
   ai-chat-service:
     build: ./Services/aiChatService
     ports:
-      - "5007:5004"
+      - "5007:5004" # Dev-only convenience; Traefik is the primary access path.
     environment:
       - PORT=5004
       - MONGODB_URI=mongodb://ai_chat_db:27017/ai_chat_db
+      - SHIPMENTS_SERVICE_URL=http://shipments-service:5000
       - SHIPMENTS_URL=http://shipments-service:5000
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
     depends_on:
       - ai_chat_db
       - shipments-service
+    networks:
+      - web
+      - internal
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.chat.rule=PathPrefix(`/chat`)"
+      - "traefik.http.routers.chat.entrypoints=web"
+      - "traefik.http.services.chat.loadbalancer.server.port=5004"
+      - "traefik.docker.network=ntg_web"
+      - "traefik.http.routers.conversations.rule=PathPrefix(`/conversations`)"
+      - "traefik.http.routers.conversations.entrypoints=web"
+      - "traefik.http.services.conversations.loadbalancer.server.port=5004"
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://localhost:5004/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 10s
+      timeout: 5s
+      retries: 10
 
   ai_chat_db:
     image: mongo:7
     ports:
-      - "27021:27017"
+      - "27021:27017" # Dev-only convenience.
+    networks:
+      - internal
     volumes:
       - ai_chat_db_data:/data/db
+
+  customer-service:
+    build: ./Services/customerService
+    environment:
+      - PORT=5001
+      - MONGODB_URI=mongodb://customer_db:27017/customer_db
+      - SHIPMENTS_SERVICE_URL=http://shipments-service:5000
+    depends_on:
+      - customer_db
+      - shipments-service
+    networks:
+      - web
+      - internal
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.customers.rule=PathPrefix(`/customers`)"
+      - "traefik.http.routers.customers.entrypoints=web"
+      - "traefik.http.services.customers.loadbalancer.server.port=5001"
+      - "traefik.docker.network=ntg_web"
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://localhost:5001/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  customer_db:
+    image: mongo:7
+    networks:
+      - internal
+    volumes:
+      - customer_db_data:/data/db
+
+  customer-support-service:
+    build: ./Services/customerSupportService
+    environment:
+      - PORT=5002
+      - MONGODB_URI=mongodb://customer_support_db:27017/customer_support_db
+      - SHIPMENTS_SERVICE_URL=http://shipments-service:5000
+    depends_on:
+      - customer_support_db
+      - shipments-service
+    networks:
+      - web
+      - internal
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.tickets.rule=PathPrefix(`/tickets`)"
+      - "traefik.http.routers.tickets.entrypoints=web"
+      - "traefik.http.services.tickets.loadbalancer.server.port=5002"
+      - "traefik.docker.network=ntg_web"
+      - "traefik.http.routers.search.rule=PathPrefix(`/search`)"
+      - "traefik.http.routers.search.entrypoints=web"
+      - "traefik.http.services.search.loadbalancer.server.port=5002"
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://localhost:5002/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  customer_support_db:
+    image: mongo:7
+    networks:
+      - internal
+    volumes:
+      - customer_support_db_data:/data/db
 
 volumes:
   shipments_db_data:
   tracking_db_data:
+  route_db_data:
   driver_db_data:
   loyalty_db_data:
+  notification_db_data:
+  sender_db_data:
+  ai_chat_db_data:
+  customer_db_data:
+  customer_support_db_data:
   rabbitmq_data:

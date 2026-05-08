@@ -1,6 +1,7 @@
 const express = require('express')
 const router = express.Router()
 const SupportTicket = require('../models/SupportTicket')
+const { requireWriteAuth } = require('../middleware/requireWriteAuth')
 
 // GET /tickets — filter på status, agentId eller shipmentId
 router.get('/', async (req, res) => {
@@ -28,7 +29,7 @@ router.get('/:id', async (req, res) => {
 })
 
 // POST /tickets
-router.post('/', async (req, res) => {
+router.post('/', requireWriteAuth, async (req, res) => {
   try {
     const ticket = new SupportTicket(req.body)
     await ticket.save()
@@ -39,7 +40,7 @@ router.post('/', async (req, res) => {
 })
 
 // PUT /tickets/:id
-router.put('/:id', async (req, res) => {
+router.put('/:id', requireWriteAuth, async (req, res) => {
   try {
     const ticket = await SupportTicket.findOneAndUpdate(
       { ticketId: req.params.id },
@@ -54,7 +55,7 @@ router.put('/:id', async (req, res) => {
 })
 
 // DELETE /tickets/:id
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', requireWriteAuth, async (req, res) => {
   try {
     const ticket = await SupportTicket.findOneAndDelete({ ticketId: req.params.id })
     if (!ticket) return res.status(404).json({ error: 'Ticket not found' })

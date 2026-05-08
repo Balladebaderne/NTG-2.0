@@ -9,10 +9,15 @@ router.get('/:id/shipments', async (req, res) => {
   try {
     const params = { customerId: req.params.id }
     if (req.query.status) params.status = req.query.status
-    if (req.query.destination) params.destination = req.query.destination
 
     const { data } = await axios.get(`${SHIPMENTS_URL}/shipments`, { params })
-    res.json(data)
+    const shipments = req.query.destination
+      ? data.filter((shipment) =>
+          JSON.stringify(shipment).toLowerCase().includes(String(req.query.destination).toLowerCase())
+        )
+      : data
+
+    res.json(shipments)
   } catch (err) {
     res.status(502).json({ error: 'Could not reach shipments service', details: err.message })
   }

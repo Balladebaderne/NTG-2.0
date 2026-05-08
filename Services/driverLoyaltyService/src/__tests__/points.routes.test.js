@@ -17,6 +17,17 @@ const adminToken = makeToken({ sub: 'usr_admin', role: 'admin' })
 const supportToken = makeToken({ sub: 'usr_support', role: 'support' })
 const logisticsToken = makeToken({ sub: 'usr_logistics', role: 'logistics' })
 
+describe('GET /health', () => {
+  it('returns service health', async () => {
+    const app = createApp()
+
+    const res = await request(app).get('/health')
+
+    expect(res.status).toBe(200)
+    expect(res.body).toEqual({ status: 'ok', service: 'driver-loyalty-service' })
+  })
+})
+
 describe('GET /drivers/:driverId/points', () => {
   let app
 

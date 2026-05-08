@@ -7,6 +7,11 @@ function createApp({ authService, corsOrigin }) {
 
   app.use(cors({ origin: corsOrigin }))
   app.use(express.json())
+
+  app.get('/health', (req, res) => {
+    res.json({ status: 'ok', service: 'login-service' })
+  })
+
   app.use('/auth', createAuthRouter(authService))
 
   return app

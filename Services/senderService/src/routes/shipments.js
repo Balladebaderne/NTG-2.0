@@ -3,7 +3,7 @@ const router = express.Router();
 const axios = require('axios');
 const Sender = require('../models/Sender');
 
-const SHIPMENTS_URL = process.env.SHIPMENTS_URL || 'http://localhost:5000';
+const SHIPMENTS_URL = process.env.SHIPMENTS_SERVICE_URL || process.env.SHIPMENTS_URL || 'http://localhost:5000';
 
 // GET /senders/:id/shipments — hent alle shipments for en shipper
 router.get('/:id/shipments', async (req, res) => {

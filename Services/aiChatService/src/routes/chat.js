@@ -4,7 +4,7 @@ const Anthropic = require('@anthropic-ai/sdk');
 const axios = require('axios');
 const Conversation = require('../models/Conversation');
 
-const SHIPMENTS_URL = process.env.SHIPMENTS_URL || 'http://localhost:5000';
+const SHIPMENTS_URL = process.env.SHIPMENTS_SERVICE_URL || process.env.SHIPMENTS_URL || 'http://localhost:5000';
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 // Stable system prompt — cached on every request (ephemeral 5-min TTL)

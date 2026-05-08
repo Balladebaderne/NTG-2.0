@@ -397,7 +397,7 @@ These are useful, but should not block the first integration pass.
 
 ### Auth Hardening
 
-- Decide whether `loginService` should be renamed/documented as `identityService`.
+- its all in loginservice
 - Add Traefik ForwardAuth or shared JWT middleware.
 - Protect mutating endpoints first:
   - `POST/PUT/DELETE /shipments`

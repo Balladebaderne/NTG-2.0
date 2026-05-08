@@ -29,6 +29,8 @@ Tracking events should reference planned route progress with:
 
 Tracking should not own Route Plan stops, route geometry, or planned times. Tracking records actual event history and can reference `routeId`, `stopId`, and future checkpoint identifiers through metadata.
 
+Route references are optional during the first integration pass. Tracking must still accept actual operational events if routeService is temporarily unavailable; route/stop validation can be added later once the HTTP runtime bridge is stable.
+
 ## Customer Read Model
 
 A customer-facing shipment view can combine:
