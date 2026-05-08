@@ -20,7 +20,14 @@ import {
   updateTicket,
 } from '../clients/supportClient'
 import { createTrackingEvent, getLatestTracking } from '../clients/trackingClient'
-import { SignedInHeader } from '../components/SignedInHeader'
+import {
+  AppShell,
+  EmptyState,
+  LoadingGrid,
+  Notice,
+  StatCard,
+  StatusBadge,
+} from '../components/PortalLayout'
 import { asArray, compactId, formatDateTime, formatStatus } from '../utils/format'
 
 const SHIPMENT_STATUS_OPTIONS = ['all', 'booked', 'in_transit', 'received']
@@ -55,20 +62,7 @@ const SERVICE_ROWS = [
   { label: 'Customers', owner: 'customerService', purpose: 'Customer records and shipment views' },
 ]
 
-const initialTicketForm = {
-  customerId: '',
-  description: '',
-  shipmentId: '',
-  subject: '',
-}
-
-async function settle(label, task) {
-  try {
-    return { label, ok: true, value: await task }
-  } catch (error) {
-    return { label, ok: false, error }
-  }
-}
+const initialTicketForm = { customerId: '', description: '', shipmentId: '', subject: '' }
 
 function formatNumber(value) {
   return new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 }).format(value || 0)
@@ -78,27 +72,21 @@ function formatPercent(value) {
   return `${formatNumber(value)}%`
 }
 
-function statusClass(value) {
-  return `status-pill status-${String(value || 'unknown').replaceAll('_', '-')}`
-}
-
-function countByStatus(items, status) {
-  return items.filter((item) => item.status === status).length
-}
-
 function openTicketCount(tickets) {
   return tickets.filter((ticket) => ['open', 'in_progress', 'escalated'].includes(ticket.status)).length
 }
 
 function searchTextForShipment(shipment) {
-  return [
-    shipment._id,
-    shipment.senderId,
-    shipment.receiverCustomerId,
-    shipment.driverId,
-    shipment.routeId,
-    shipment.status,
-  ].filter(Boolean).join(' ').toLowerCase()
+  return [shipment._id, shipment.senderId, shipment.receiverCustomerId, shipment.driverId, shipment.routeId, shipment.status]
+    .filter(Boolean).join(' ').toLowerCase()
+}
+
+async function settle(label, task) {
+  try {
+    return { label, ok: true, value: await task }
+  } catch (error) {
+    return { label, ok: false, error }
+  }
 }
 
 export function AdminLandingPage({ onNavigate, onSignOut, profile, token }) {
@@ -153,9 +141,7 @@ export function AdminLandingPage({ onNavigate, onSignOut, profile, token }) {
     const valueFor = (label) => results.find((result) => result.label === label)
     const shipments = asArray(valueFor('Shipments')?.value)
     const trackingResults = await Promise.all(
-      shipments.slice(0, 8).map((shipment) => (
-        settle(`Tracking ${shipment._id}`, getLatestTracking(shipment._id, { token }))
-      ))
+      shipments.slice(0, 8).map((shipment) => settle(`Tracking ${shipment._id}`, getLatestTracking(shipment._id, { token })))
     )
 
     setState({
@@ -202,41 +188,38 @@ export function AdminLandingPage({ onNavigate, onSignOut, profile, token }) {
     const driverById = new Map(state.drivers.map((driver) => [String(driver.id), driver]))
     const routeByShipmentId = new Map(state.routes.map((route) => [route.shipmentId, route]))
     const trackingByShipmentId = new Map(state.trackingSummaries.map((summary) => [summary.shipmentId, summary]))
-
     return { customerById, driverById, routeByShipmentId, senderById, trackingByShipmentId }
   }, [state])
 
   const metrics = useMemo(() => {
     const totalShipments = state.shipments.length
-    const activeShipments = state.shipments.filter((shipment) => shipment.status !== 'received').length
+    const activeShipments = state.shipments.filter((s) => s.status !== 'received').length
     const routeCoverage = totalShipments
-      ? Math.round((state.shipments.filter((shipment) => shipment.routeId).length / totalShipments) * 100)
+      ? Math.round((state.shipments.filter((s) => s.routeId).length / totalShipments) * 100)
       : 0
-    const availableDrivers = state.drivers.filter((driver) => driver.available).length
-    const unreadNotifications = state.notifications.filter((notification) => !notification.readAt).length
+    const availableDrivers = state.drivers.filter((d) => d.available).length
+    const unreadNotifications = state.notifications.filter((n) => !n.readAt).length
     const exceptionCount = state.delayed.length + state.discrepancies.length + state.missingEvents.length
-
     return [
-      { detail: `${formatNumber(activeShipments)} active`, label: 'Shipments', value: totalShipments },
-      { detail: `${formatNumber(state.delayed.length)} delayed`, label: 'Exceptions', value: exceptionCount },
-      { detail: `${formatPercent(routeCoverage)} route linked`, label: 'Route coverage', value: routeCoverage },
-      { detail: `${formatNumber(availableDrivers)} available`, label: 'Drivers', value: state.drivers.length },
-      { detail: `${formatNumber(unreadNotifications)} unread`, label: 'Notifications', value: state.notifications.length },
-      { detail: `${formatNumber(openTicketCount(state.tickets))} open`, label: 'Support tickets', value: state.tickets.length },
+      { detail: `${formatNumber(activeShipments)} active`, icon: 'box', label: 'Shipments', value: totalShipments },
+      { detail: `${formatNumber(state.delayed.length)} delayed`, icon: 'warning', label: 'Exceptions', tone: 'warning', value: exceptionCount },
+      { detail: `${formatPercent(routeCoverage)} route linked`, icon: 'route', label: 'Route coverage', value: `${routeCoverage}%` },
+      { detail: `${formatNumber(availableDrivers)} available`, icon: 'truck', label: 'Drivers', value: state.drivers.length },
+      { detail: `${formatNumber(unreadNotifications)} unread`, icon: 'document', label: 'Notifications', value: state.notifications.length },
+      { detail: `${formatNumber(openTicketCount(state.tickets))} open`, icon: 'user', label: 'Support tickets', value: state.tickets.length },
     ]
   }, [state])
 
   const filteredShipments = useMemo(() => {
     const query = filters.query.trim().toLowerCase()
-
     return state.shipments
-      .filter((shipment) => filters.status === 'all' || shipment.status === filters.status)
-      .filter((shipment) => !query || searchTextForShipment(shipment).includes(query))
+      .filter((s) => filters.status === 'all' || s.status === filters.status)
+      .filter((s) => !query || searchTextForShipment(s).includes(query))
       .slice(0, 10)
   }, [filters, state.shipments])
 
   const serviceRows = useMemo(() => {
-    const failedLabels = state.errors.map((error) => error.split(':')[0])
+    const failedLabels = state.errors.map((e) => e.split(':')[0])
     const counts = {
       Customers: state.customers.length,
       Drivers: state.drivers.length,
@@ -247,37 +230,29 @@ export function AdminLandingPage({ onNavigate, onSignOut, profile, token }) {
       Support: state.tickets.length,
       Tracking: state.trackingSummaries.length,
     }
-
     return SERVICE_ROWS.map((row) => ({
       ...row,
       count: counts[row.label] || 0,
-      health: failedLabels.some((label) => label === row.label || label.startsWith(`${row.label} `))
-        ? 'Degraded'
-        : 'Online',
+      health: failedLabels.some((l) => l === row.label || l.startsWith(`${row.label} `)) ? 'Degraded' : 'Online',
     }))
   }, [state])
 
-  function shipmentLabel(shipmentId) {
-    return compactId(shipmentId)
+  function shipmentLabel(id) { return compactId(id) }
+  function customerLabel(id) {
+    const c = lookups.customerById.get(id)
+    return c?.company || c?.name || compactId(id)
   }
-
-  function customerLabel(customerId) {
-    const customer = lookups.customerById.get(customerId)
-    return customer?.company || customer?.name || compactId(customerId)
+  function senderLabel(id) {
+    const s = lookups.senderById.get(id)
+    return s?.company || s?.name || compactId(id)
   }
-
-  function senderLabel(senderId) {
-    const sender = lookups.senderById.get(senderId)
-    return sender?.company || sender?.name || compactId(senderId)
-  }
-
-  function driverLabel(driverId) {
-    const driver = lookups.driverById.get(String(driverId))
-    return driver?.name || compactId(driverId)
+  function driverLabel(id) {
+    const d = lookups.driverById.get(String(id))
+    return d?.name || compactId(id)
   }
 
   function handleTicketShipmentChange(shipmentId) {
-    const shipment = state.shipments.find((item) => item._id === shipmentId)
+    const shipment = state.shipments.find((s) => s._id === shipmentId)
     setTicketForm((current) => ({
       ...current,
       customerId: shipment?.receiverCustomerId || current.customerId,
@@ -302,14 +277,13 @@ export function AdminLandingPage({ onNavigate, onSignOut, profile, token }) {
     await runAction(
       'scan-delays',
       () => scanDelayNotifications({ token }),
-      (result) => `Delay scan complete: ${formatNumber(result.delayed)} delayed and ${formatNumber(result.created)} notifications created.`
+      (r) => `Delay scan complete: ${formatNumber(r.delayed)} delayed and ${formatNumber(r.created)} notifications created.`
     )
   }
 
   async function handleMarkNotificationRead(notification) {
     const notificationId = notification.id || notification.notificationId
     if (!notificationId) return
-
     await runAction(
       `notification-${notificationId}`,
       () => markNotificationRead(notificationId, { token }),
@@ -327,12 +301,10 @@ export function AdminLandingPage({ onNavigate, onSignOut, profile, token }) {
 
   async function handleRecordMilestone(event) {
     event.preventDefault()
-
     if (!trackingForm.shipmentId) {
       setAction({ busy: '', message: 'Select a shipment before recording a milestone.', tone: 'warning' })
       return
     }
-
     const saved = await runAction(
       'tracking',
       () => createTrackingEvent(trackingForm.shipmentId, {
@@ -341,25 +313,20 @@ export function AdminLandingPage({ onNavigate, onSignOut, profile, token }) {
         notes: trackingForm.notes || undefined,
         occurredAt: new Date().toISOString(),
       }, { token }),
-      () => 'Tracking milestone recorded and shipment status sync requested.'
+      () => 'Tracking milestone recorded.'
     )
     if (saved) setTrackingForm((current) => ({ ...current, notes: '' }))
   }
 
   async function handleCreateTicket(event) {
     event.preventDefault()
-
     if (!ticketForm.shipmentId || !ticketForm.customerId || !ticketForm.subject || !ticketForm.description) {
-      setAction({ busy: '', message: 'Fill shipment, customer, subject, and description before creating a ticket.', tone: 'warning' })
+      setAction({ busy: '', message: 'Fill shipment, customer, subject, and description.', tone: 'warning' })
       return
     }
-
     const saved = await runAction(
       'ticket-create',
-      () => createTicket({
-        ...ticketForm,
-        agentId: profile?.id || profile?.email || 'admin-console',
-      }, { token }),
+      () => createTicket({ ...ticketForm, agentId: profile?.id || profile?.email || 'admin-console' }, { token }),
       () => 'Support ticket created.'
     )
     if (saved) setTicketForm((current) => ({ ...current, description: '', subject: '' }))
@@ -376,22 +343,15 @@ export function AdminLandingPage({ onNavigate, onSignOut, profile, token }) {
   async function handleSupportSearch(event) {
     event.preventDefault()
     const query = supportSearch.query.trim()
-
     if (!query) {
-      setSupportSearch((current) => ({ ...current, error: 'Enter a shipment id, destination, or reference.' }))
+      setSupportSearch((current) => ({ ...current, error: 'Enter a shipment ID, destination, or reference.' }))
       return
     }
-
     setSupportSearch((current) => ({ ...current, error: '', loading: true, results: [] }))
-
     try {
       const result = supportSearch.mode === 'id'
         ? await searchTracking(query, { token })
-        : await searchShipments({
-          [supportSearch.mode]: query,
-          token,
-        })
-
+        : await searchShipments({ [supportSearch.mode]: query, token })
       setSupportSearch((current) => ({
         ...current,
         loading: false,
@@ -403,103 +363,94 @@ export function AdminLandingPage({ onNavigate, onSignOut, profile, token }) {
   }
 
   return (
-    <main className="operations-shell admin-console-shell">
-      <SignedInHeader active="admin" onNavigate={onNavigate} onSignOut={onSignOut} profile={profile} />
-
-      <section className="admin-console" aria-labelledby="admin-title">
-        <div className="admin-console-heading">
-          <div>
-            <p className="eyebrow">Admin console</p>
-            <h1 id="admin-title">Control tower</h1>
-            <p>
-              Operational command surface for the NTG service platform: shipment lifecycle, route coverage, tracking
-              milestones, delay notifications, driver capacity, and support escalation.
-            </p>
-          </div>
-          <div className="admin-heading-actions">
-            <button
-              className="secondary-button compact"
-              disabled={action.busy === 'scan-delays'}
-              onClick={handleScanDelays}
-              type="button"
-            >
-              {action.busy === 'scan-delays' ? 'Scanning...' : 'Scan delays'}
-            </button>
-            <button className="primary-button compact" disabled={state.loading} onClick={loadAdminLanding} type="button">
-              {state.loading ? 'Refreshing...' : 'Refresh data'}
-            </button>
-            <span>{state.updatedAt ? `Updated ${formatDateTime(state.updatedAt)}` : 'Loading live data'}</span>
-          </div>
+    <AppShell active="operator-console" onNavigate={onNavigate} onSignOut={onSignOut} profile={profile}>
+      {/* Hero */}
+      <section className="workspace-hero">
+        <div>
+          <p className="eyebrow">Admin console</p>
+          <h1>Control tower</h1>
+          <p>
+            Operational command surface for the NTG service platform: shipment lifecycle, route coverage, tracking
+            milestones, delay notifications, driver capacity, and support escalation.
+          </p>
         </div>
+        <div className="workspace-hero-actions">
+          <button
+            className="button-secondary"
+            disabled={action.busy === 'scan-delays'}
+            onClick={handleScanDelays}
+            type="button"
+          >
+            {action.busy === 'scan-delays' ? 'Scanning delays' : 'Scan delays'}
+          </button>
+          <button className="button-secondary" disabled={state.loading} onClick={loadAdminLanding} type="button">
+            {state.loading ? 'Refreshing' : 'Refresh data'}
+          </button>
+          <span>{state.updatedAt ? `Updated ${formatDateTime(state.updatedAt)}` : 'Loading live data'}</span>
+        </div>
+      </section>
 
-        {action.message ? (
-          <p className={`notice ${action.tone}`} role="status">{action.message}</p>
-        ) : null}
+      {/* Global notices */}
+      {action.message ? <Notice tone={action.tone}>{action.message}</Notice> : null}
+      {state.errors.length > 0 ? (
+        <Notice tone="warning">
+          <strong>Some backend services did not answer.</strong>
+          <ul>{state.errors.map((error) => <li key={error}>{error}</li>)}</ul>
+        </Notice>
+      ) : null}
 
-        {state.errors.length > 0 ? (
-          <div className="notice warning" role="status">
-            <strong>Some backend services did not answer.</strong>
-            <ul>
-              {state.errors.map((error) => (
-                <li key={error}>{error}</li>
-              ))}
-            </ul>
-          </div>
-        ) : null}
+      {/* Metrics grid */}
+      {state.loading ? <LoadingGrid count={6} /> : (
+        <div className="stat-grid-6">
+          {metrics.map((metric) => (
+            <StatCard
+              key={metric.label}
+              detail={metric.detail}
+              icon={metric.icon}
+              label={metric.label}
+              tone={metric.tone || 'default'}
+              value={metric.value}
+            />
+          ))}
+        </div>
+      )}
 
-        {state.loading ? (
-          <div className="admin-stat-grid" aria-label="Loading admin metrics">
-            {Array.from({ length: 6 }).map((_, index) => (
-              <span className="skeleton-block" key={index} />
-            ))}
-          </div>
-        ) : (
-          <div className="admin-stat-grid">
-            {metrics.map((metric) => (
-              <article className="admin-stat-card" key={metric.label}>
-                <span>{metric.label}</span>
-                <strong>{metric.label === 'Route coverage' ? formatPercent(metric.value) : formatNumber(metric.value)}</strong>
-                <p>{metric.detail}</p>
-              </article>
-            ))}
-          </div>
-        )}
-
-        <div className="admin-workspace">
-          <section className="admin-panel admin-workboard" aria-labelledby="workboard-title">
-            <div className="admin-panel-heading">
+      {/* Live workboard + side rail */}
+      {!state.loading && (
+        <div className="panel-grid">
+          <section className="panel">
+            <div className="panel-heading">
               <div>
                 <span>Shipment operations</span>
-                <h2 id="workboard-title">Live workboard</h2>
-              </div>
-              <div className="admin-filter-row">
-                <label className="field">
-                  <span>Status</span>
-                  <select
-                    onChange={(event) => setFilters((current) => ({ ...current, status: event.target.value }))}
-                    value={filters.status}
-                  >
-                    {SHIPMENT_STATUS_OPTIONS.map((status) => (
-                      <option key={status} value={status}>{formatStatus(status)}</option>
-                    ))}
-                  </select>
-                </label>
-                <label className="field">
-                  <span>Filter</span>
-                  <input
-                    onChange={(event) => setFilters((current) => ({ ...current, query: event.target.value }))}
-                    placeholder="Shipment, sender, customer, driver"
-                    value={filters.query}
-                  />
-                </label>
+                <h2>Live workboard</h2>
               </div>
             </div>
-
+            <div className="form-grid two" style={{ marginBottom: '18px' }}>
+              <label className="field">
+                <span>Status</span>
+                <select
+                  onChange={(event) => setFilters((current) => ({ ...current, status: event.target.value }))}
+                  value={filters.status}
+                >
+                  {SHIPMENT_STATUS_OPTIONS.map((status) => (
+                    <option key={status} value={status}>{formatStatus(status)}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="field">
+                <span>Filter</span>
+                <input
+                  onChange={(event) => setFilters((current) => ({ ...current, query: event.target.value }))}
+                  placeholder="Shipment, sender, customer, driver"
+                  value={filters.query}
+                />
+              </label>
+            </div>
             {filteredShipments.length === 0 ? (
-              <p className="empty-state compact-state">No shipments match the current filter.</p>
+              <EmptyState compact message="No shipments match the current filter." />
             ) : (
-              <div className="data-table-wrap">
-                <table className="data-table admin-data-table">
+              <div className="table-scroll">
+                <table className="data-table">
                   <thead>
                     <tr>
                       <th scope="col">Shipment</th>
@@ -516,18 +467,17 @@ export function AdminLandingPage({ onNavigate, onSignOut, profile, token }) {
                     {filteredShipments.map((shipment) => {
                       const route = lookups.routeByShipmentId.get(shipment._id)
                       const tracking = lookups.trackingByShipmentId.get(shipment._id)
-
                       return (
                         <tr key={shipment._id}>
                           <td>{shipmentLabel(shipment._id)}</td>
-                          <td><span className={statusClass(shipment.status)}>{formatStatus(shipment.status)}</span></td>
+                          <td><StatusBadge status={shipment.status} /></td>
                           <td>{customerLabel(shipment.receiverCustomerId)}</td>
                           <td>{senderLabel(shipment.senderId)}</td>
                           <td>{route ? formatStatus(route.status) : compactId(shipment.routeId)}</td>
                           <td>{tracking?.trackingStatusLabel || 'No event yet'}</td>
                           <td>{formatDateTime(shipment.estimatedArrivalAt)}</td>
                           <td>
-                            <button className="link-button" type="button" onClick={() => onNavigate(`/shipments/${shipment._id}`)}>
+                            <button className="link-button" onClick={() => onNavigate(`/shipments/${shipment._id}`)} type="button">
                               Open
                             </button>
                           </td>
@@ -540,26 +490,27 @@ export function AdminLandingPage({ onNavigate, onSignOut, profile, token }) {
             )}
           </section>
 
-          <aside className="admin-side-rail">
-            <section className="admin-panel" aria-labelledby="exception-title">
-              <div className="admin-panel-heading compact-heading">
+          <div className="panel-aside-stack">
+            {/* Exception queue */}
+            <section className="panel">
+              <div className="panel-heading">
                 <div>
                   <span>Exception queue</span>
-                  <h2 id="exception-title">Needs attention</h2>
+                  <h2>Needs attention</h2>
                 </div>
               </div>
-              <ul className="admin-plain-list">
+              <ul className="split-list">
                 <li>
-                  <span>Delayed shipments</span>
-                  <strong>{formatNumber(state.delayed.length)}</strong>
+                  <div><strong>Delayed shipments</strong><small>ETA threshold exceeded</small></div>
+                  <StatusBadge status={state.delayed.length ? 'delayed' : 'online'} />
                 </li>
                 <li>
-                  <span>Data discrepancies</span>
-                  <strong>{formatNumber(state.discrepancies.length)}</strong>
+                  <div><strong>Data discrepancies</strong><small>Missing goods or route records</small></div>
+                  <span>{formatNumber(state.discrepancies.length)}</span>
                 </li>
                 <li>
-                  <span>Missing goods records</span>
-                  <strong>{formatNumber(state.missingEvents.length)}</strong>
+                  <div><strong>Missing events</strong><small>Incomplete operational records</small></div>
+                  <span>{formatNumber(state.missingEvents.length)}</span>
                 </li>
               </ul>
               {state.discrepancies.slice(0, 3).map((item) => (
@@ -570,38 +521,37 @@ export function AdminLandingPage({ onNavigate, onSignOut, profile, token }) {
               ))}
             </section>
 
-            <section className="admin-panel" aria-labelledby="notifications-title">
-              <div className="admin-panel-heading compact-heading">
+            {/* Latest alerts */}
+            <section className="panel">
+              <div className="panel-heading">
                 <div>
                   <span>Notifications</span>
-                  <h2 id="notifications-title">Latest alerts</h2>
+                  <h2>Latest alerts</h2>
                 </div>
               </div>
               {state.notifications.length === 0 ? (
-                <p className="empty-state compact-state">No notifications have been created.</p>
+                <EmptyState compact message="No notifications have been created." />
               ) : (
-                <ul className="admin-notification-list">
+                <ul className="split-list">
                   {state.notifications.slice(0, 5).map((notification) => {
                     const notificationId = notification.id || notification.notificationId
-
                     return (
                       <li key={notificationId || `${notification.shipmentId}-${notification.createdAt}`}>
                         <div>
-                          <span>{formatStatus(notification.type || notification.recipientRole)}</span>
                           <strong>{notification.title || 'Notification'}</strong>
                           <small>{compactId(notification.shipmentId)} / {formatDateTime(notification.createdAt)}</small>
                         </div>
                         {!notification.readAt && notificationId ? (
                           <button
-                            className="link-button"
+                            className="button-neutral compact"
                             disabled={action.busy === `notification-${notificationId}`}
                             onClick={() => handleMarkNotificationRead(notification)}
                             type="button"
                           >
-                            Read
+                            Mark read
                           </button>
                         ) : (
-                          <span className="read-label">Read</span>
+                          <span className="read-badge">Read</span>
                         )}
                       </li>
                     )
@@ -609,27 +559,31 @@ export function AdminLandingPage({ onNavigate, onSignOut, profile, token }) {
                 </ul>
               )}
             </section>
-          </aside>
+          </div>
         </div>
+      )}
 
-        <div className="admin-tool-grid">
-          <section className="admin-panel" aria-labelledby="tracking-action-title">
-            <div className="admin-panel-heading compact-heading">
+      {/* Operational tools: 2x2 grid */}
+      {!state.loading && (
+        <div className="panel-grid equal">
+          {/* Record tracking milestone */}
+          <section className="form-panel">
+            <div className="panel-heading">
               <div>
                 <span>Tracking service</span>
-                <h2 id="tracking-action-title">Record milestone</h2>
+                <h2>Record milestone</h2>
               </div>
             </div>
-            <form className="admin-form" onSubmit={handleRecordMilestone}>
+            <form className="stacked-form" onSubmit={handleRecordMilestone}>
               <label className="field">
                 <span>Shipment</span>
                 <select
                   onChange={(event) => setTrackingForm((current) => ({ ...current, shipmentId: event.target.value }))}
                   value={trackingForm.shipmentId}
                 >
-                  {state.shipments.map((shipment) => (
-                    <option key={shipment._id} value={shipment._id}>
-                      {shipmentLabel(shipment._id)} / {formatStatus(shipment.status)}
+                  {state.shipments.map((s) => (
+                    <option key={s._id} value={s._id}>
+                      {shipmentLabel(s._id)} / {formatStatus(s.status)}
                     </option>
                   ))}
                 </select>
@@ -640,8 +594,8 @@ export function AdminLandingPage({ onNavigate, onSignOut, profile, token }) {
                   onChange={(event) => setTrackingForm((current) => ({ ...current, eventType: event.target.value }))}
                   value={trackingForm.eventType}
                 >
-                  {TRACKING_MILESTONES.map((milestone) => (
-                    <option key={milestone.value} value={milestone.value}>{milestone.label}</option>
+                  {TRACKING_MILESTONES.map((m) => (
+                    <option key={m.value} value={m.value}>{m.label}</option>
                   ))}
                 </select>
               </label>
@@ -653,32 +607,33 @@ export function AdminLandingPage({ onNavigate, onSignOut, profile, token }) {
                   value={trackingForm.notes}
                 />
               </label>
-              <button className="primary-button fit-button" disabled={action.busy === 'tracking'} type="submit">
-                {action.busy === 'tracking' ? 'Recording...' : 'Record milestone'}
+              <button className="button-primary" disabled={action.busy === 'tracking'} type="submit">
+                {action.busy === 'tracking' ? 'Recording' : 'Record milestone'}
               </button>
             </form>
           </section>
 
-          <section className="admin-panel" aria-labelledby="ticket-action-title">
-            <div className="admin-panel-heading compact-heading">
+          {/* Create support escalation */}
+          <section className="form-panel">
+            <div className="panel-heading">
               <div>
                 <span>Support service</span>
-                <h2 id="ticket-action-title">Create escalation</h2>
+                <h2>Create escalation</h2>
               </div>
             </div>
-            <form className="admin-form" onSubmit={handleCreateTicket}>
+            <form className="stacked-form" onSubmit={handleCreateTicket}>
               <label className="field">
                 <span>Shipment</span>
                 <select onChange={(event) => handleTicketShipmentChange(event.target.value)} value={ticketForm.shipmentId}>
-                  {state.shipments.map((shipment) => (
-                    <option key={shipment._id} value={shipment._id}>
-                      {shipmentLabel(shipment._id)} / {customerLabel(shipment.receiverCustomerId)}
+                  {state.shipments.map((s) => (
+                    <option key={s._id} value={s._id}>
+                      {shipmentLabel(s._id)} / {customerLabel(s.receiverCustomerId)}
                     </option>
                   ))}
                 </select>
               </label>
               <label className="field">
-                <span>Customer id</span>
+                <span>Customer ID</span>
                 <input
                   onChange={(event) => setTicketForm((current) => ({ ...current, customerId: event.target.value }))}
                   value={ticketForm.customerId}
@@ -688,7 +643,7 @@ export function AdminLandingPage({ onNavigate, onSignOut, profile, token }) {
                 <span>Subject</span>
                 <input
                   onChange={(event) => setTicketForm((current) => ({ ...current, subject: event.target.value }))}
-                  placeholder="Delay, discrepancy, or customer escalation"
+                  placeholder="Delay, discrepancy, or escalation subject"
                   value={ticketForm.subject}
                 />
               </label>
@@ -700,59 +655,65 @@ export function AdminLandingPage({ onNavigate, onSignOut, profile, token }) {
                   value={ticketForm.description}
                 />
               </label>
-              <button className="primary-button fit-button" disabled={action.busy === 'ticket-create'} type="submit">
-                {action.busy === 'ticket-create' ? 'Creating...' : 'Create ticket'}
+              <button className="button-primary" disabled={action.busy === 'ticket-create'} type="submit">
+                {action.busy === 'ticket-create' ? 'Creating' : 'Create ticket'}
               </button>
             </form>
           </section>
 
-          <section className="admin-panel" aria-labelledby="driver-title">
-            <div className="admin-panel-heading compact-heading">
+          {/* Driver capacity */}
+          <section className="panel">
+            <div className="panel-heading">
               <div>
                 <span>Driver service</span>
-                <h2 id="driver-title">Capacity</h2>
+                <h2>Capacity</h2>
               </div>
             </div>
-            <ul className="admin-driver-list">
-              {state.drivers.map((driver) => (
-                <li key={driver.id}>
-                  <div>
-                    <strong>{driver.name}</strong>
-                    <span>{driver.email}</span>
-                  </div>
-                  <button
-                    className={`driver-toggle ${driver.available ? 'is-on' : ''}`}
-                    disabled={action.busy === `driver-${driver.id}`}
-                    onClick={() => handleToggleDriver(driver)}
-                    type="button"
-                  >
-                    {driver.available ? 'Available' : 'Unavailable'}
-                  </button>
-                </li>
-              ))}
-            </ul>
+            {state.drivers.length === 0 ? (
+              <EmptyState compact message="No driver records available." />
+            ) : (
+              <ul className="split-list">
+                {state.drivers.map((driver) => (
+                  <li key={driver.id}>
+                    <div>
+                      <strong>{driver.name}</strong>
+                      <small>{driver.email}</small>
+                    </div>
+                    <button
+                      className={driver.available ? 'driver-available-pill' : 'driver-unavailable-pill'}
+                      disabled={action.busy === `driver-${driver.id}`}
+                      onClick={() => handleToggleDriver(driver)}
+                      type="button"
+                    >
+                      {driver.available ? 'Available' : 'Unavailable'}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
           </section>
 
-          <section className="admin-panel" aria-labelledby="ticket-list-title">
-            <div className="admin-panel-heading compact-heading">
+          {/* Ticket queue */}
+          <section className="panel">
+            <div className="panel-heading">
               <div>
                 <span>Ticket queue</span>
-                <h2 id="ticket-list-title">Status control</h2>
+                <h2>Status control</h2>
               </div>
             </div>
             {state.tickets.length === 0 ? (
-              <p className="empty-state compact-state">No support tickets yet.</p>
+              <EmptyState compact message="No support tickets yet." />
             ) : (
-              <ul className="admin-ticket-list">
+              <ul className="split-list">
                 {state.tickets.slice(0, 5).map((ticket) => (
                   <li key={ticket.ticketId}>
                     <div>
-                      <span>{formatStatus(ticket.status)}</span>
                       <strong>{ticket.subject}</strong>
                       <small>{compactId(ticket.shipmentId)} / {formatDateTime(ticket.createdAt)}</small>
                     </div>
                     <select
                       aria-label={`Update status for ${ticket.subject}`}
+                      className="ticket-status-select"
                       onChange={(event) => handleTicketStatus(ticket, event.target.value)}
                       value={ticket.status}
                     >
@@ -766,16 +727,20 @@ export function AdminLandingPage({ onNavigate, onSignOut, profile, token }) {
             )}
           </section>
         </div>
+      )}
 
-        <div className="admin-bottom-grid">
-          <section className="admin-panel" aria-labelledby="support-search-title">
-            <div className="admin-panel-heading">
+      {/* Bottom intel grid */}
+      {!state.loading && (
+        <div className="panel-grid three">
+          {/* Support search */}
+          <section className="form-panel">
+            <div className="panel-heading">
               <div>
                 <span>Support search</span>
-                <h2 id="support-search-title">Find shipment context</h2>
+                <h2>Find shipment context</h2>
               </div>
             </div>
-            <form className="admin-search-form" onSubmit={handleSupportSearch}>
+            <form className="stacked-form" onSubmit={handleSupportSearch}>
               <label className="field">
                 <span>Mode</span>
                 <select
@@ -784,28 +749,30 @@ export function AdminLandingPage({ onNavigate, onSignOut, profile, token }) {
                 >
                   <option value="reference">Reference</option>
                   <option value="destination">Destination</option>
-                  <option value="id">Shipment id</option>
+                  <option value="id">Shipment ID</option>
                 </select>
               </label>
               <label className="field">
                 <span>Search value</span>
                 <input
                   onChange={(event) => setSupportSearch((current) => ({ ...current, query: event.target.value }))}
-                  placeholder="Shipment id, destination, or reference"
+                  placeholder="ID, destination, or reference"
                   value={supportSearch.query}
                 />
               </label>
-              <button className="primary-button fit-button" disabled={supportSearch.loading} type="submit">
-                {supportSearch.loading ? 'Searching...' : 'Search'}
+              <button className="button-primary" disabled={supportSearch.loading} type="submit">
+                {supportSearch.loading ? 'Searching' : 'Search'}
               </button>
             </form>
-            {supportSearch.error ? <p className="form-error" role="alert">{supportSearch.error}</p> : null}
+            {supportSearch.error ? <Notice tone="warning">{supportSearch.error}</Notice> : null}
             {supportSearch.results.length > 0 ? (
-              <ul className="admin-search-results">
+              <ul className="split-list" style={{ marginTop: '14px' }}>
                 {supportSearch.results.slice(0, 5).map((shipment) => (
                   <li key={shipment._id || shipment.shipmentId}>
-                    <span>{compactId(shipment._id || shipment.shipmentId)}</span>
-                    <strong>{formatStatus(shipment.status)}</strong>
+                    <div>
+                      <strong>{compactId(shipment._id || shipment.shipmentId)}</strong>
+                      <small>{formatStatus(shipment.status)}</small>
+                    </div>
                     <button
                       className="link-button"
                       onClick={() => onNavigate(`/shipments/${shipment._id || shipment.shipmentId}`)}
@@ -819,52 +786,57 @@ export function AdminLandingPage({ onNavigate, onSignOut, profile, token }) {
             ) : null}
           </section>
 
-          <section className="admin-panel" aria-labelledby="routes-title">
-            <div className="admin-panel-heading">
+          {/* Route plans */}
+          <section className="panel">
+            <div className="panel-heading">
               <div>
                 <span>Route service</span>
-                <h2 id="routes-title">Route plans</h2>
+                <h2>Route plans</h2>
               </div>
               <span>{formatNumber(state.routes.length)} records</span>
             </div>
-            <ul className="admin-route-list">
-              {state.routes.slice(0, 6).map((route) => (
-                <li key={route.routeId}>
-                  <div>
-                    <span>{compactId(route.routeId)}</span>
-                    <strong>{route.origin?.address?.city || 'Origin'} to {route.destination?.address?.city || 'Destination'}</strong>
-                    <small>{shipmentLabel(route.shipmentId)} / {driverLabel(route.assignedDriverId)}</small>
-                  </div>
-                  <span className={statusClass(route.status)}>{formatStatus(route.status)}</span>
-                </li>
-              ))}
-            </ul>
+            {state.routes.length === 0 ? (
+              <EmptyState compact message="No route plans available." />
+            ) : (
+              <ul className="split-list">
+                {state.routes.slice(0, 6).map((route) => (
+                  <li key={route.routeId}>
+                    <div>
+                      <strong>{route.origin?.address?.city || 'Origin'} → {route.destination?.address?.city || 'Destination'}</strong>
+                      <small>{shipmentLabel(route.shipmentId)} / {driverLabel(route.assignedDriverId)}</small>
+                    </div>
+                    <StatusBadge status={route.status} />
+                  </li>
+                ))}
+              </ul>
+            )}
           </section>
 
-          <section className="admin-panel" aria-labelledby="services-title">
-            <div className="admin-panel-heading">
+          {/* Backend service health */}
+          <section className="panel">
+            <div className="panel-heading">
               <div>
                 <span>Platform map</span>
-                <h2 id="services-title">Backend services</h2>
+                <h2>Backend services</h2>
               </div>
             </div>
-            <div className="admin-service-table">
+            <div className="service-health-grid">
               {serviceRows.map((service) => (
-                <article key={service.label}>
+                <article className="service-health-row" key={service.label}>
                   <div>
                     <strong>{service.label}</strong>
-                    <span>{service.owner}</span>
+                    <span className="service-owner">{service.owner}</span>
                   </div>
-                  <p>{service.purpose}</p>
-                  <span className={service.health === 'Online' ? 'health-ok' : 'health-bad'}>
-                    {service.health} / {formatNumber(service.count)}
+                  <p className="service-purpose">{service.purpose}</p>
+                  <span className={`status-badge ${service.health === 'Online' ? 'status-online' : 'status-delayed'}`}>
+                    {service.health}
                   </span>
                 </article>
               ))}
             </div>
           </section>
         </div>
-      </section>
-    </main>
+      )}
+    </AppShell>
   )
 }

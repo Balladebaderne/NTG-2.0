@@ -9,6 +9,11 @@ const iconPaths = {
       <path d="M12 12v9" />
     </>
   ),
+  chat: (
+    <>
+      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+    </>
+  ),
   check: (
     <>
       <path d="M20 6 9 17l-5-5" />
@@ -61,6 +66,11 @@ const iconPaths = {
       <path d="M10 9V5h4v4" />
     </>
   ),
+  star: (
+    <>
+      <path d="m12 2 3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+    </>
+  ),
   truck: (
     <>
       <path d="M3 6h11v10H3V6Z" />
@@ -96,19 +106,23 @@ const roleNav = {
     { id: 'customer-dashboard', label: 'Dashboard', path: '/customer/dashboard' },
     { id: 'customer-shipments', label: 'Shipments', path: '/customer/shipments' },
     { id: 'customer-support', label: 'Contact NTG', path: '/customer/support' },
+    { id: 'customer-chat', label: 'AI Assistant', path: '/chat' },
   ],
   driver: [
     { id: 'driver-dashboard', label: 'My shipments', path: '/driver/dashboard' },
     { id: 'driver-assigned', label: 'Assigned route', path: '/driver/assigned-shipments' },
     { id: 'driver-events', label: 'Route events', path: '/driver/events' },
+    { id: 'driver-loyalty', label: 'My rewards', path: '/driver/loyalty' },
   ],
   operator: [
     { id: 'operator-dashboard', label: 'Dashboard', path: '/operator/dashboard' },
     { id: 'operator-shipments', label: 'Shipments', path: '/operator/shipments' },
-    { id: 'operator-create', label: 'Create shipment', path: '/operator/shipments/create' },
+    { id: 'operator-create', label: 'New shipment', path: '/operator/shipments/create' },
     { id: 'operator-drivers', label: 'Drivers', path: '/operator/drivers' },
     { id: 'operator-customers', label: 'Customers', path: '/operator/customers' },
     { id: 'operator-events', label: 'Events', path: '/operator/events' },
+    { id: 'operator-console', label: 'Console', path: '/admin/console' },
+    { id: 'operator-chat', label: 'AI Chat', path: '/chat' },
   ],
 }
 
@@ -135,12 +149,17 @@ export function Icon({ name = 'box' }) {
   )
 }
 
-export function BrandMark({ onClick }) {
+export function BrandMark({ onClick, inverted = false }) {
+  const logo = inverted
+    ? 'https://country.ntg.com/wp-content/uploads/ntg-logo-negativ.png'
+    : 'https://country.ntg.com/wp-content/uploads/ntg-logo.png'
+
   const content = (
-    <>
-      <span>NTG</span>
-      <small>Nordic Transport Group</small>
-    </>
+    <img
+      alt="NTG Nordic Transport Group"
+      className="brand-logo"
+      src={logo}
+    />
   )
 
   if (!onClick) return <div className="brand-lockup">{content}</div>
@@ -189,9 +208,9 @@ export function SignedInHeader({ active, onNavigate, onSignOut, profile }) {
 
   return (
     <header className="site-header signed-in-header">
-      <BrandMark onClick={() => onNavigate(roleHomePath(profile))} />
+      <BrandMark inverted onClick={() => onNavigate(roleHomePath(profile))} />
       <nav aria-label="Role navigation" className="site-nav">
-        {items.slice(0, role === 'operator' ? 5 : 4).map((item) => (
+        {items.map((item) => (
           <button
             aria-current={active === item.id ? 'page' : undefined}
             className={active === item.id ? 'is-active' : undefined}
@@ -245,8 +264,7 @@ export function AppShell({ active, children, onNavigate, onSignOut, profile }) {
   return (
     <main className="portal-shell">
       <SignedInHeader active={active} onNavigate={onNavigate} onSignOut={onSignOut} profile={profile} />
-      <div className="workspace-layout">
-        <RoleNavigation active={active} onNavigate={onNavigate} profile={profile} />
+      <div className="workspace-main-only">
         <section className="workspace-main">{children}</section>
       </div>
     </main>
@@ -264,7 +282,7 @@ export function CorporateFooter({ onNavigate }) {
     <footer className="corporate-footer">
       <div className="container footer-grid">
         <div>
-          <BrandMark />
+          <BrandMark inverted />
           <p>
             Corporate transport visibility for customers, drivers, and operations teams across the NTG network.
           </p>
@@ -485,6 +503,34 @@ export function LoadingGrid({ count = 4 }) {
       {Array.from({ length: count }).map((_, index) => (
         <span className="skeleton-block" key={index} />
       ))}
+    </div>
+  )
+}
+
+export function ProgressBar({ label, max = 100, tone = 'default', value = 0 }) {
+  const pct = Math.min(100, Math.round((value / Math.max(max, 1)) * 100))
+  return (
+    <div className="progress-wrap">
+      {label ? <span className="progress-label">{label}</span> : null}
+      <div className="progress-bar-track">
+        <div className={`progress-bar-fill tone-${tone}`} style={{ width: `${pct}%` }} />
+      </div>
+    </div>
+  )
+}
+
+export function LoyaltyCard({ driverName, points = 0, tier = 'Bronze' }) {
+  const tierClass = `tier-${tier.toLowerCase()}`
+  return (
+    <div className="loyalty-card">
+      <div className="loyalty-card-body">
+        <span className="loyalty-card-eyebrow">Driver rewards</span>
+        <p className="loyalty-card-points">{Number(points).toLocaleString()}</p>
+        <p className="loyalty-card-sub">Total accumulated points{driverName ? ` · ${driverName}` : ''}</p>
+      </div>
+      <div>
+        <span className={`loyalty-tier-badge ${tierClass}`}>{tier} tier</span>
+      </div>
     </div>
   )
 }

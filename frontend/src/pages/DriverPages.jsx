@@ -1,11 +1,14 @@
 import React, { useEffect, useMemo, useState } from 'react'
+import { getDriverPoints } from '../clients/loyaltyClient'
 import { listShipments } from '../clients/shipmentsClient'
 import { createLocationUpdate, createTrackingEvent, getLatestTracking } from '../clients/trackingClient'
 import {
   AppShell,
   EmptyState,
   LoadingGrid,
+  LoyaltyCard,
   Notice,
+  ProgressBar,
   ShipmentCard,
   ShipmentTable,
   StatCard,
@@ -365,6 +368,129 @@ export function DriverEventsPage({ onNavigate, onSignOut, profile, token }) {
         </div>
       ) : null}
       {!state.loading && state.trackingSummaries.length === 0 ? <EmptyState message="No route events are available for assigned shipments." /> : null}
+    </AppShell>
+  )
+}
+
+export function DriverLoyaltyPage({ onNavigate, onSignOut, profile, token }) {
+  const [loyaltyState, setLoyaltyState] = useState({ loading: true, points: null, error: '' })
+
+  useEffect(() => {
+    const driverId = driverIdFor(profile)
+    setLoyaltyState({ loading: true, points: null, error: '' })
+    getDriverPoints(driverId, { token })
+      .then((data) => setLoyaltyState({ loading: false, points: data, error: '' }))
+      .catch((err) => setLoyaltyState({ loading: false, points: null, error: err.message }))
+  }, [profile?.id, token])
+
+  const totalPoints = loyaltyState.points?.totalPoints ?? loyaltyState.points?.points ?? 0
+  const tier =
+    totalPoints >= 10000 ? 'Platinum'
+    : totalPoints >= 5000 ? 'Gold'
+    : totalPoints >= 1000 ? 'Silver'
+    : 'Bronze'
+  const nextTierPoints =
+    totalPoints >= 10000 ? 10000
+    : totalPoints >= 5000 ? 10000
+    : totalPoints >= 1000 ? 5000
+    : 1000
+  const nextTierLabel =
+    tier === 'Bronze' ? 'Silver'
+    : tier === 'Silver' ? 'Gold'
+    : tier === 'Gold' ? 'Platinum'
+    : 'Max tier'
+
+  return (
+    <AppShell active="driver-loyalty" onNavigate={onNavigate} onSignOut={onSignOut} profile={profile}>
+      <section className="workspace-hero">
+        <div>
+          <p className="eyebrow">Driver rewards</p>
+          <h1>My loyalty points</h1>
+          <p>
+            Points are earned automatically for each completed shipment event registered in the system.
+            Reach new tiers to unlock priority assignment and rewards.
+          </p>
+        </div>
+      </section>
+
+      {loyaltyState.loading ? <LoadingGrid count={2} /> : null}
+      {loyaltyState.error ? <Notice tone="warning">{loyaltyState.error}</Notice> : null}
+
+      {!loyaltyState.loading ? (
+        <>
+          <div className="panel-grid equal">
+            <LoyaltyCard driverName={profile?.name} points={totalPoints} tier={tier} />
+
+            <section className="panel">
+              <div className="panel-heading">
+                <div>
+                  <span>Tier progress</span>
+                  <h2>Points overview</h2>
+                </div>
+              </div>
+              <div className="stacked-form">
+                <ProgressBar
+                  label={`${Number(totalPoints).toLocaleString()} / ${nextTierPoints.toLocaleString()} points to ${nextTierLabel}`}
+                  max={nextTierPoints}
+                  value={Math.min(totalPoints, nextTierPoints)}
+                />
+              </div>
+              <ul className="split-list" style={{ marginTop: '20px' }}>
+                <li>
+                  <div>
+                    <strong>Total points</strong>
+                    <small>Lifetime accumulated</small>
+                  </div>
+                  <strong style={{ color: 'var(--color-primary-navy)', fontSize: '1.3rem' }}>
+                    {Number(totalPoints).toLocaleString()}
+                  </strong>
+                </li>
+                <li>
+                  <div>
+                    <strong>Current tier</strong>
+                    <small>Your rewards level</small>
+                  </div>
+                  <span className="status-badge">{tier}</span>
+                </li>
+                <li>
+                  <div>
+                    <strong>Next tier at</strong>
+                    <small>Points required</small>
+                  </div>
+                  <span>{nextTierPoints.toLocaleString()} pts</span>
+                </li>
+              </ul>
+            </section>
+          </div>
+
+          <section className="panel">
+            <div className="panel-heading">
+              <div>
+                <span>Tier system</span>
+                <h2>How the rewards work</h2>
+              </div>
+            </div>
+            <ul className="split-list">
+              <li>
+                <div><strong>Bronze</strong><small>0 – 999 points</small></div>
+                <span>Starting tier for all drivers</span>
+              </li>
+              <li>
+                <div><strong>Silver</strong><small>1,000 – 4,999 points</small></div>
+                <span>Priority assignment consideration</span>
+              </li>
+              <li>
+                <div><strong>Gold</strong><small>5,000 – 9,999 points</small></div>
+                <span>Bonus recognition and priority routes</span>
+              </li>
+              <li>
+                <div><strong>Platinum</strong><small>10,000+ points</small></div>
+                <span>Top performer — maximum rewards</span>
+              </li>
+            </ul>
+          </section>
+        </>
+      ) : null}
     </AppShell>
   )
 }

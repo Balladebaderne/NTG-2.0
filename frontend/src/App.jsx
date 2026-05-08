@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { normalizeRole, roleHomePath } from './components/PortalLayout'
+import { AdminLandingPage } from './pages/AdminLandingPage'
+import { ChatPage } from './pages/ChatPage'
 import {
   CustomerDashboardPage,
   CustomerShipmentsPage,
@@ -9,6 +11,7 @@ import {
   DriverAssignedShipmentsPage,
   DriverDashboardPage,
   DriverEventsPage,
+  DriverLoyaltyPage,
   DriverShipmentUpdatePage,
 } from './pages/DriverPages'
 import { LoginPage } from './pages/LoginPage'
@@ -194,6 +197,17 @@ export function App() {
   }
   if (pathname === '/driver/events') {
     return <DriverEventsPage onNavigate={handleNavigate} onSignOut={handleSignOut} profile={profile} token={token} />
+  }
+  if (pathname === '/driver/loyalty') {
+    return <DriverLoyaltyPage onNavigate={handleNavigate} onSignOut={handleSignOut} profile={profile} token={token} />
+  }
+
+  if (pathname === '/chat') {
+    return <ChatPage onNavigate={handleNavigate} onSignOut={handleSignOut} profile={profile} token={token} />
+  }
+
+  if (pathname === '/admin/console') {
+    return <AdminLandingPage onNavigate={handleNavigate} onSignOut={handleSignOut} profile={profile} token={token} />
   }
 
   if (pathname === '/operator/dashboard' || pathname === '/admin') {

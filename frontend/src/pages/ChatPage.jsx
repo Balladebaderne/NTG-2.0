@@ -1,8 +1,20 @@
 import React, { useEffect, useState } from 'react'
 import { getConversation, listConversations, sendChatMessage } from '../clients/chatClient'
+import {
+  AppShell,
+  EmptyState,
+  Notice,
+  normalizeRole,
+} from '../components/PortalLayout'
 import { asArray, compactId, formatDateTime } from '../utils/format'
 
-export function ChatPage({ onNavigate, onSignOut, token }) {
+function activeFor(profile) {
+  const role = normalizeRole(profile?.role)
+  if (role === 'customer') return 'customer-chat'
+  return 'operator-chat'
+}
+
+export function ChatPage({ onNavigate, onSignOut, profile, token }) {
   const [conversations, setConversations] = useState([])
   const [conversation, setConversation] = useState(null)
   const [customerId, setCustomerId] = useState('')
@@ -73,103 +85,108 @@ export function ChatPage({ onNavigate, onSignOut, token }) {
   }
 
   return (
-    <main className="operations-shell">
-      <header className="top-bar">
-        <button className="brand-button" type="button" onClick={() => onNavigate('/dashboard')}>
-          NTG
-        </button>
-        <nav aria-label="Primary navigation" className="primary-nav">
-          <button type="button" onClick={() => onNavigate('/dashboard')}>Dashboard</button>
-          <button type="button" onClick={() => onNavigate('/support')}>Support</button>
-          <button type="button" onClick={() => onNavigate('/chat')}>Chat</button>
-        </nav>
-        <button className="secondary-button compact" type="button" onClick={onSignOut}>
-          Sign out
-        </button>
-      </header>
-
-      <section className="page-section" aria-labelledby="chat-title">
-        <div className="page-heading">
-          <div>
-            <p className="eyebrow">AI assistant</p>
-            <h1 id="chat-title">Shipment chat</h1>
-            <p className="dashboard-copy">
-              Ask Shipment-related questions using the chat service and its Shipment context bridge.
-            </p>
-          </div>
-          <button className="primary-button fit-button" type="button" onClick={loadConversations} disabled={isLoading}>
-            {isLoading ? 'Refreshing...' : 'Refresh'}
+    <AppShell active={activeFor(profile)} onNavigate={onNavigate} onSignOut={onSignOut} profile={profile}>
+      <section className="workspace-hero">
+        <div>
+          <p className="eyebrow">AI assistant</p>
+          <h1>Shipment chat</h1>
+          <p>
+            Ask shipment-related questions using natural language. The assistant has access to live shipment and tracking data.
+          </p>
+        </div>
+        <div className="workspace-hero-actions">
+          <button className="button-secondary" disabled={isLoading} onClick={loadConversations} type="button">
+            {isLoading ? 'Refreshing' : 'Refresh'}
           </button>
         </div>
+      </section>
 
-        {error ? <p className="form-error" role="alert">{error}</p> : null}
+      {error ? <Notice tone="warning">{error}</Notice> : null}
 
-        <div className="chat-layout">
-          <aside className="content-panel" aria-labelledby="conversation-list-heading">
-            <div className="section-heading">
-              <h2 id="conversation-list-heading">Conversations</h2>
+      <div className="chat-layout">
+        <aside className="panel" aria-labelledby="conversation-list-heading">
+          <div className="panel-heading">
+            <div>
               <span>{conversations.length} saved</span>
+              <h2 id="conversation-list-heading">Conversations</h2>
             </div>
+          </div>
+
+          <div className="stacked-form">
             <label className="field">
               <span>Customer filter</span>
-              <input value={customerId} onChange={(event) => setCustomerId(event.target.value)} placeholder="Optional customerId" />
+              <input
+                onChange={(event) => setCustomerId(event.target.value)}
+                placeholder="Optional customer ID"
+                value={customerId}
+              />
             </label>
-            <button className="secondary-button fit-button" type="button" onClick={loadConversations}>
+            <button className="button-neutral compact" onClick={loadConversations} type="button">
               Apply filter
             </button>
-            {isLoading ? <p className="empty-state compact-state">Loading conversations...</p> : null}
-            {!isLoading && conversations.length === 0 ? (
-              <p className="empty-state compact-state">No conversations yet.</p>
-            ) : null}
-            <ul className="stack-list">
+          </div>
+
+          {isLoading ? <EmptyState compact message="Loading conversations..." /> : null}
+          {!isLoading && conversations.length === 0 ? (
+            <EmptyState compact message="No conversations yet. Start one by sending a message." />
+          ) : null}
+
+          {conversations.length > 0 ? (
+            <ul className="split-list" style={{ marginTop: '14px' }}>
               {conversations.map((item) => (
                 <li key={item.conversationId}>
-                  <span>{compactId(item.conversationId)}</span>
-                  <strong>{item.customerId || 'No customer context'}</strong>
-                  <small>{formatDateTime(item.updatedAt || item.createdAt)}</small>
-                  <button className="link-button" type="button" onClick={() => openConversation(item.conversationId)}>
+                  <div>
+                    <strong>{item.customerId || 'No customer context'}</strong>
+                    <small>{compactId(item.conversationId)} / {formatDateTime(item.updatedAt || item.createdAt)}</small>
+                  </div>
+                  <button className="link-button" onClick={() => openConversation(item.conversationId)} type="button">
                     Open
                   </button>
                 </li>
               ))}
             </ul>
-          </aside>
+          ) : null}
+        </aside>
 
-          <section className="content-panel wide" aria-labelledby="chat-panel-heading">
-            <div className="section-heading">
+        <section className="panel" aria-labelledby="chat-panel-heading">
+          <div className="panel-heading">
+            <div>
+              <span>{conversation ? compactId(conversation.conversationId) : 'New conversation'}</span>
               <h2 id="chat-panel-heading">Messages</h2>
-              <span>{conversation ? compactId(conversation.conversationId) : 'new conversation'}</span>
             </div>
+          </div>
 
-            <div className="message-list" aria-live="polite">
-              {asArray(conversation?.messages).length === 0 ? (
-                <p className="empty-state compact-state">Start a conversation to see messages here.</p>
-              ) : (
-                conversation.messages.map((item, index) => (
-                  <article className={`message-bubble ${item.role}`} key={`${item.role}-${index}`}>
-                    <span>{item.role === 'assistant' ? 'Assistant' : 'You'}</span>
-                    <p>{item.content}</p>
-                  </article>
-                ))
-              )}
-            </div>
+          <div className="message-list" aria-live="polite">
+            {asArray(conversation?.messages).length === 0 ? (
+              <EmptyState
+                compact
+                message="Start a conversation by typing a question below. Try: 'Where is shipment X?' or 'Are there any delays today?'"
+              />
+            ) : (
+              conversation.messages.map((item, index) => (
+                <article className={`message-bubble ${item.role}`} key={`${item.role}-${index}`}>
+                  <span>{item.role === 'assistant' ? 'NTG AI' : 'You'}</span>
+                  <p>{item.content}</p>
+                </article>
+              ))
+            )}
+          </div>
 
-            <form className="chat-form" onSubmit={handleSubmit}>
-              <label className="field">
-                <span>Message</span>
-                <textarea
-                  onChange={(event) => setMessage(event.target.value)}
-                  placeholder="Ask about delays, status, ETA, or location."
-                  value={message}
-                />
-              </label>
-              <button className="primary-button fit-button" type="submit" disabled={isSending}>
-                {isSending ? 'Sending...' : 'Send'}
-              </button>
-            </form>
-          </section>
-        </div>
-      </section>
-    </main>
+          <form className="chat-form" onSubmit={handleSubmit} style={{ marginTop: '14px' }}>
+            <label className="field">
+              <span>Message</span>
+              <textarea
+                onChange={(event) => setMessage(event.target.value)}
+                placeholder="Ask about delays, shipment status, ETA, or location..."
+                value={message}
+              />
+            </label>
+            <button className="button-primary" disabled={isSending} type="submit">
+              {isSending ? 'Sending' : 'Send message'}
+            </button>
+          </form>
+        </section>
+      </div>
+    </AppShell>
   )
 }

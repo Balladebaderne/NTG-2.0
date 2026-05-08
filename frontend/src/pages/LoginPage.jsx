@@ -35,7 +35,7 @@ export function LoginPage({ onAuthenticated }) {
     <main className="login-page">
       <div className="login-layout">
         <section className="login-brand-panel" aria-labelledby="page-title">
-          <BrandMark />
+          <BrandMark inverted />
           <p className="eyebrow">NTG role portal</p>
           <h1 id="page-title">Transport visibility for every shipment</h1>
           <p>
