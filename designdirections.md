@@ -1077,6 +1077,93 @@ The final impression should be:
 “This belongs to a serious logistics company.”
 
 ```
+📦 Shipment Service – User Stories
+Som kunde vil jeg kunne se shipment‑detaljer så jeg kan følge min forsendelse.
+Som kunde vil jeg kunne se status på min forsendelse så jeg ved hvor den er i processen.
+Som kunde vil jeg kunne søge på tracking‑ID/reference så jeg hurtigt finder min forsendelse.
+Som system vil jeg publicere shipment‑events så andre services kan reagere på ændringer.
+Som system vil jeg integrere med Event Service så shipment‑status altid er opdateret.
+Som kunde vil jeg kunne se ETA så jeg ved hvornår min forsendelse ankommer.
+Som AI‑chat vil jeg kunne hente shipment‑data så jeg kan svare brugeren.
+🔄 Tracking Service – User Stories
+Som system vil jeg lytte på events så shipment‑status altid er opdateret.
+Som system vil jeg gemme event‑log så historik kan vises til brugeren.
+Som kunde vil jeg se opdateret status så jeg ved hvor min forsendelse er.
+Som system vil jeg opdage manglende eller forsinkede events så jeg kan markere forsinkelser.
+Som system vil jeg trigge ETA‑reberegning når der sker ændringer.
+🕒 ETA Service – User Stories
+Som kunde vil jeg se en realistisk ETA så jeg kan planlægge modtagelse.
+Som system vil jeg beregne rutetid via Google Maps så ETA er præcis.
+Som system vil jeg tage højde for kørehvile‑regler så ETA er realistisk.
+Som system vil jeg tage højde for grænseventetid så ETA afspejler virkeligheden.
+Som system vil jeg beregne dag/nat‑kørsel så ETA bliver korrekt.
+Som system vil jeg sende ETA tilbage til Shipment Service så den kan vises til brugeren.
+Som system vil jeg reberegne ETA ved nye events så data altid er opdateret.
+🤖 AI Chat Service – User Stories
+Som bruger vil jeg kunne spørge “Hvor er min pakke?” så jeg hurtigt får svar.
+Som bruger vil jeg kunne spørge “Hvornår ankommer min pakke?” så jeg kan planlægge.
+Som bruger vil jeg kunne spørge om forsinkelser så jeg ved om noget er galt.
+Som bruger vil jeg kunne filtrere efter destination (fx Rotterdam) så jeg får overblik.
+Som system vil jeg mappe naturligt sprog til intents så jeg forstår brugerens spørgsmål.
+Som system vil jeg integrere med Anthropic så jeg kan generere naturlige svar.
+Som system vil jeg hente data fra Shipment Service så jeg kan give korrekte svar.
+🔔 Notification Service – User Stories
+Som kunde vil jeg modtage notifikationer ved forsinkelser så jeg kan reagere.
+Som system vil jeg opdage forsinkelser så jeg kan informere brugeren.
+Som system vil jeg sende notifikationer så kunden holdes opdateret.
+👤 Customer Service – User Stories
+Som kunde vil jeg se et shipment‑overblik så jeg kan følge alle mine forsendelser.
+Som kunde vil jeg filtrere efter status/destination så jeg kan finde relevante shipments.
+Som kunde vil jeg se detaljer og event‑historik så jeg forstår forløbet.
+Som kunde vil jeg se forsinkelsesoversigt så jeg kan reagere hurtigt.
+Som virksomhed vil jeg se statistik (on‑time rate, leveringstid, destinationer) så jeg kan optimere drift.
+🆘 Customer Support Service – User Stories
+Som supportmedarbejder vil jeg søge på tracking‑ID så jeg hurtigt kan hjælpe kunder.
+Som supportmedarbejder vil jeg søge på reference/destination så jeg kan finde shipments.
+Som supportmedarbejder vil jeg se forsinkede shipments så jeg kan kontakte kunder proaktivt.
+Som supportmedarbejder vil jeg se manglende events så jeg kan fejlfinde.
+Som supportmedarbejder vil jeg se uoverensstemmelser så jeg kan eskalere problemer.
+🚛 Driver Service – User Stories
+Som administrator vil jeg oprette chauffører så de kan tilknyttes shipments.
+Som administrator vil jeg tilknytte chauffører til shipments så ansvar er tydeligt.
+Som chauffør vil jeg registrere events så systemet ved hvor jeg er.
+Som system vil jeg publicere chauffør‑events så andre services kan reagere.
+🏢 Sender Service – User Stories
+Som virksomhed vil jeg oprette shipper/consignee så shipments kan registreres korrekt.
+Som system vil jeg validere adresser så fejl minimeres.
+Som kunde vil jeg se shipper/consignee‑data i frontend så jeg har overblik.
+⭐ Driver Loyalty Service – User Stories
+Som chauffør vil jeg optjene point så jeg belønnes for min indsats.
+Som system vil jeg beregne point så chauffører får korrekt reward.
+Som chauffør vil jeg se min pointsaldo så jeg kan følge min progression.
+Som chauffør vil jeg indløse rewards så jeg får værdi af mine point.
+Som system vil jeg tildele point ved events så belønning sker automatisk.
+🖥️ Frontend – User Stories
+Grundstruktur
+Som bruger vil jeg have et overskueligt layout så jeg nemt kan navigere.
+Som bruger vil jeg logge ind så jeg kan se mine data.
+Som system vil jeg integrere via API Gateway så frontend er koblet til backend.
+Tracking View
+Som kunde vil jeg indtaste tracking‑ID så jeg kan finde min forsendelse.
+Som kunde vil jeg se en progressbar så jeg hurtigt forstår status.
+Som kunde vil jeg se event‑timeline så jeg kan følge historikken.
+Som kunde vil jeg se ETA så jeg ved hvornår pakken kommer.
+Som kunde vil jeg se forsinkelser tydeligt markeret.
+Dashboard
+Som kunde vil jeg se alle aktive forsendelser så jeg har overblik.
+Som kunde vil jeg filtrere og søge så jeg hurtigt finder det jeg leder efter.
+Som kunde vil jeg se forsinkelsesoversigt så jeg kan reagere.
+Som kunde vil jeg se detaljer og historik.
+Statistik
+Som virksomhed vil jeg se on‑time rate så jeg kan måle performance.
+Som virksomhed vil jeg se leveringstid så jeg kan optimere logistik.
+Som virksomhed vil jeg se destinationer og exceptions så jeg kan analysere mønstre.
+AI Chat UI
+Som bruger vil jeg skrive i chatten så jeg kan få svar.
+Som bruger vil jeg se chat‑historik så jeg kan følge samtalen.
+Som bruger vil jeg se AI‑svar så jeg får hurtig hjælp.
+
+
 
 This version removes the role-specific breakdown and focuses only on the **shared NTG-like visual direction** that should apply everywhere.
 ```
