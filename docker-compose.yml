@@ -71,6 +71,7 @@ services:
       - "traefik.enable=true"
       - "traefik.http.routers.frontend.rule=PathPrefix(`/`)"
       - "traefik.http.routers.frontend.entrypoints=web"
+      - "traefik.http.routers.frontend.priority=1"
       - "traefik.http.services.frontend.loadbalancer.server.port=3000"
       - "traefik.docker.network=ntg_web"
 
@@ -111,6 +112,7 @@ services:
       # Route /shipments (and nested /shipments/:id/goods, etc.) to this service
       - "traefik.http.routers.shipments.rule=PathPrefix(`/shipments`)"
       - "traefik.http.routers.shipments.entrypoints=web"
+      - "traefik.http.routers.shipments.priority=10"
       - "traefik.http.services.shipments.loadbalancer.server.port=5000"
       - "traefik.docker.network=ntg_web"
     healthcheck:
@@ -143,7 +145,8 @@ services:
       - RABBITMQ_USER=guest
       - RABBITMQ_PASS=guest
     depends_on:
-      - tracking_db
+      tracking_db:
+        condition: service_healthy
     networks:
       - web
       - internal
@@ -152,6 +155,7 @@ services:
       - "traefik.enable=true"
       - "traefik.http.routers.tracking.rule=PathPrefix(`/tracking`)"
       - "traefik.http.routers.tracking.entrypoints=web"
+      - "traefik.http.routers.tracking.priority=10"
       - "traefik.http.services.tracking.loadbalancer.server.port=5000"
       - "traefik.docker.network=ntg_web"
     healthcheck:
@@ -170,6 +174,11 @@ services:
       - internal
     volumes:
       - tracking_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d tracking_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   route-service:
     build: ./Services/routeService
@@ -184,8 +193,10 @@ services:
       - ROUTE_CALCULATION_PROVIDER=google
       - ROUTE_CALCULATION_REQUIRED=false
     depends_on:
-      - route_db
-      - shipments-service
+      route_db:
+        condition: service_healthy
+      shipments-service:
+        condition: service_healthy
     networks:
       - web
       - internal
@@ -193,6 +204,7 @@ services:
       - "traefik.enable=true"
       - "traefik.http.routers.routes.rule=PathPrefix(`/routes`)"
       - "traefik.http.routers.routes.entrypoints=web"
+      - "traefik.http.routers.routes.priority=10"
       - "traefik.http.services.routes.loadbalancer.server.port=5000"
       - "traefik.docker.network=ntg_web"
     healthcheck:
@@ -211,6 +223,11 @@ services:
       - internal
     volumes:
       - route_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d route_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   driver-service:
     build: ./Services/driverService
@@ -227,6 +244,7 @@ services:
       - "traefik.enable=true"
       - "traefik.http.routers.drivers.rule=PathPrefix(`/drivers`)"
       - "traefik.http.routers.drivers.entrypoints=web"
+      - "traefik.http.routers.drivers.priority=10"
       - "traefik.http.services.drivers.loadbalancer.server.port=5001"
       - "traefik.docker.network=ntg_web"
     healthcheck:
@@ -322,6 +340,7 @@ services:
       - "traefik.enable=true"
       - "traefik.http.routers.notifications.rule=PathPrefix(`/notifications`)"
       - "traefik.http.routers.notifications.entrypoints=web"
+      - "traefik.http.routers.notifications.priority=10"
       - "traefik.http.services.notifications.loadbalancer.server.port=5002"
       - "traefik.docker.network=ntg_web"
     healthcheck:
@@ -361,6 +380,7 @@ services:
       - "traefik.enable=true"
       - "traefik.http.routers.senders.rule=PathPrefix(`/senders`)"
       - "traefik.http.routers.senders.entrypoints=web"
+      - "traefik.http.routers.senders.priority=10"
       - "traefik.http.services.senders.loadbalancer.server.port=5003"
       - "traefik.docker.network=ntg_web"
     healthcheck:
@@ -396,15 +416,11 @@ services:
       - internal
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.chat.rule=PathPrefix(`/chat`)"
+      - "traefik.http.routers.chat.rule=PathPrefix(`/chat`) || PathPrefix(`/conversations`)"
       - "traefik.http.routers.chat.entrypoints=web"
-      - "traefik.http.routers.chat.service=chat"
+      - "traefik.http.routers.chat.priority=10"
       - "traefik.http.services.chat.loadbalancer.server.port=5004"
       - "traefik.docker.network=ntg_web"
-      - "traefik.http.routers.conversations.rule=PathPrefix(`/conversations`)"
-      - "traefik.http.routers.conversations.entrypoints=web"
-      - "traefik.http.routers.conversations.service=conversations"
-      - "traefik.http.services.conversations.loadbalancer.server.port=5004"
     healthcheck:
       test: ["CMD-SHELL", "node -e \"fetch('http://localhost:5004/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
       interval: 10s
@@ -436,6 +452,7 @@ services:
       - "traefik.enable=true"
       - "traefik.http.routers.customers.rule=PathPrefix(`/customers`)"
       - "traefik.http.routers.customers.entrypoints=web"
+      - "traefik.http.routers.customers.priority=10"
       - "traefik.http.services.customers.loadbalancer.server.port=5001"
       - "traefik.docker.network=ntg_web"
     healthcheck:
@@ -465,15 +482,11 @@ services:
       - internal
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.tickets.rule=PathPrefix(`/tickets`)"
+      - "traefik.http.routers.tickets.rule=PathPrefix(`/tickets`) || PathPrefix(`/search`)"
       - "traefik.http.routers.tickets.entrypoints=web"
-      - "traefik.http.routers.tickets.service=tickets"
+      - "traefik.http.routers.tickets.priority=10"
       - "traefik.http.services.tickets.loadbalancer.server.port=5002"
       - "traefik.docker.network=ntg_web"
-      - "traefik.http.routers.search.rule=PathPrefix(`/search`)"
-      - "traefik.http.routers.search.entrypoints=web"
-      - "traefik.http.routers.search.service=search"
-      - "traefik.http.services.search.loadbalancer.server.port=5002"
     healthcheck:
       test: ["CMD-SHELL", "node -e \"fetch('http://localhost:5002/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
       interval: 10s
