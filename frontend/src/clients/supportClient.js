@@ -23,3 +23,15 @@ export function getDelayedShipments({ token } = {}) {
 export function getDiscrepancies({ token } = {}) {
   return apiRequest('/search/discrepancies', { token })
 }
+
+export function getMissingEvents({ token } = {}) {
+  return apiRequest('/search/missing-events', { token })
+}
+
+export function updateTicket(ticketId, ticket, { token } = {}) {
+  return apiRequest(`/tickets/${encodeURIComponent(ticketId)}`, {
+    body: ticket,
+    method: 'PUT',
+    token,
+  })
+}

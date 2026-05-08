@@ -16,6 +16,14 @@
     "roleLabel": "Driver"
   },
   {
+    "id": "customer-1",
+    "name": "NTG Customer",
+    "email": "customer@ntg.local",
+    "password": "customer123",
+    "role": "customer",
+    "roleLabel": "Customer"
+  },
+  {
     "id": "usr_support",
     "name": "NTG Support",
     "email": "support@ntg.local",

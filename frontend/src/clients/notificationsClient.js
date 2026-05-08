@@ -10,3 +10,10 @@ export function markNotificationRead(notificationId, { token } = {}) {
     token,
   })
 }
+
+export function scanDelayNotifications({ token } = {}) {
+  return apiRequest('/notifications/scan-delays', {
+    method: 'POST',
+    token,
+  })
+}

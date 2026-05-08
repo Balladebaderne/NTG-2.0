@@ -3,6 +3,15 @@ import { listNotifications } from '../clients/notificationsClient'
 import { listRoutes } from '../clients/routesClient'
 import { getShipment } from '../clients/shipmentsClient'
 import { getTrackingStatus } from '../clients/trackingClient'
+import {
+  AppShell,
+  EmptyState,
+  LoadingGrid,
+  Notice,
+  SectionHeader,
+  StatusBadge,
+  Timeline,
+} from '../components/PortalLayout'
 import { asArray, compactId, formatDateTime, formatStatus } from '../utils/format'
 
 async function settle(label, task) {
@@ -14,18 +23,28 @@ async function settle(label, task) {
 }
 
 function AddressBlock({ address }) {
-  if (!address) return <p className="empty-state compact-state">No address recorded.</p>
+  if (!address) return <EmptyState compact message="No address recorded." title="Address missing" />
 
   return (
-    <address className="address-block">
-      <span>{address.street || 'Street not set'}</span>
-      <span>{[address.postalCode, address.city].filter(Boolean).join(' ') || 'City not set'}</span>
-      <span>{address.country || 'Country not set'}</span>
-    </address>
+    <ul className="split-list">
+      <li>
+        <address>
+          <strong>{address.street || 'Street not set'}</strong>
+          <small>{[address.postalCode, address.city, address.country].filter(Boolean).join(', ') || 'City not set'}</small>
+        </address>
+      </li>
+    </ul>
   )
 }
 
-export function ShipmentDetailPage({ onNavigate, onSignOut, shipmentId, token }) {
+export function ShipmentDetailPage({
+  active = 'customer-shipments',
+  onNavigate,
+  onSignOut,
+  profile,
+  shipmentId,
+  token,
+}) {
   const [state, setState] = useState({
     errors: [],
     loading: true,
@@ -53,11 +72,11 @@ export function ShipmentDetailPage({ onNavigate, onSignOut, shipmentId, token })
 
     const shipment = shipmentResult.value
     const [routesResult, trackingResult, notificationsResult] = await Promise.all([
-      settle('Routes', listRoutes({ token, filters: { shipmentId } })),
+      settle('Routes', listRoutes({ filters: { shipmentId }, token })),
       settle('Tracking', getTrackingStatus(shipmentId, { token })),
       settle('Notifications', listNotifications({
-        token,
         filters: { receiverCustomerId: shipment.receiverCustomerId },
+        token,
       })),
     ])
 
@@ -81,64 +100,40 @@ export function ShipmentDetailPage({ onNavigate, onSignOut, shipmentId, token })
   const history = asArray(state.tracking?.history)
 
   return (
-    <main className="operations-shell">
-      <header className="top-bar">
-        <button className="brand-button" type="button" onClick={() => onNavigate('/dashboard')}>
-          NTG
-        </button>
-        <nav aria-label="Primary navigation" className="primary-nav">
-          <button type="button" onClick={() => onNavigate('/dashboard')}>Dashboard</button>
-          <button type="button" onClick={() => onNavigate('/support')}>Support</button>
-          <button type="button" onClick={() => onNavigate('/chat')}>Chat</button>
-        </nav>
-        <button className="secondary-button compact" type="button" onClick={onSignOut}>
-          Sign out
-        </button>
-      </header>
-
-      <section className="page-section" aria-labelledby="shipment-title">
-        <div className="page-heading">
-          <div>
-            <p className="eyebrow">Shipment detail</p>
-            <h1 id="shipment-title">{compactId(shipmentId)}</h1>
-            <p className="dashboard-copy">
-              Joined view from Shipment, Route, Tracking, and Notification services.
-            </p>
-          </div>
-          <button className="primary-button fit-button" type="button" onClick={loadShipmentDetail} disabled={state.loading}>
-            {state.loading ? 'Refreshing...' : 'Refresh'}
+    <AppShell active={active} onNavigate={onNavigate} onSignOut={onSignOut} profile={profile}>
+      <section className="workspace-hero">
+        <div>
+          <p className="eyebrow">Shipment detail</p>
+          <h1>{compactId(shipmentId)}</h1>
+          <p>Full shipment view with lifecycle status, route information, goods, notifications, and event history.</p>
+        </div>
+        <div className="workspace-hero-actions">
+          <button className="button-primary" disabled={state.loading} onClick={loadShipmentDetail} type="button">
+            {state.loading ? 'Refreshing' : 'Refresh'}
           </button>
         </div>
+      </section>
 
-        {state.errors.length > 0 ? (
-          <div className="notice warning" role="status">
-            <strong>Some detail services did not answer.</strong>
-            <ul>
-              {state.errors.map((error) => (
-                <li key={error}>{error}</li>
-              ))}
-            </ul>
-          </div>
-        ) : null}
+      {state.errors.length > 0 ? (
+        <Notice tone="warning">
+          <strong>Some shipment services did not answer.</strong>
+          <ul>{state.errors.map((error) => <li key={error}>{error}</li>)}</ul>
+        </Notice>
+      ) : null}
 
-        {state.loading ? (
-          <div className="skeleton-grid" aria-label="Loading Shipment detail">
-            {Array.from({ length: 4 }).map((_, index) => (
-              <span className="skeleton-block tall" key={index} />
-            ))}
-          </div>
-        ) : null}
+      {state.loading ? <LoadingGrid count={4} /> : null}
+      {!state.loading && !state.shipment ? <EmptyState message="Shipment was not found." /> : null}
 
-        {!state.loading && !state.shipment ? (
-          <p className="empty-state">Shipment was not found.</p>
-        ) : null}
-
-        {!state.loading && state.shipment && (
-          <div className="detail-grid">
-            <section className="content-panel" aria-labelledby="summary-heading">
-              <div className="section-heading">
-                <h2 id="summary-heading">Summary</h2>
-                <span className="status-pill">{formatStatus(state.shipment.status)}</span>
+      {!state.loading && state.shipment ? (
+        <>
+          <div className="panel-grid equal">
+            <section className="panel">
+              <div className="panel-heading">
+                <div>
+                  <span>Overview</span>
+                  <h2>Shipment summary</h2>
+                </div>
+                <StatusBadge status={state.shipment.status} />
               </div>
               <dl className="definition-grid">
                 <div><dt>Sender</dt><dd>{compactId(state.shipment.senderId)}</dd></div>
@@ -150,13 +145,16 @@ export function ShipmentDetailPage({ onNavigate, onSignOut, shipmentId, token })
               </dl>
             </section>
 
-            <section className="content-panel" aria-labelledby="route-heading">
-              <div className="section-heading">
-                <h2 id="route-heading">Route</h2>
+            <section className="panel">
+              <div className="panel-heading">
+                <div>
+                  <span>Route</span>
+                  <h2>Transport plan</h2>
+                </div>
                 <span>{route ? formatStatus(route.status) : 'No route'}</span>
               </div>
               {route ? (
-                <div className="route-columns">
+                <div className="panel-grid equal">
                   <div>
                     <h3>Origin</h3>
                     <AddressBlock address={route.origin?.address} />
@@ -165,83 +163,69 @@ export function ShipmentDetailPage({ onNavigate, onSignOut, shipmentId, token })
                     <h3>Destination</h3>
                     <AddressBlock address={route.destination?.address} />
                   </div>
-                  <dl className="definition-grid slim">
-                    <div><dt>Distance</dt><dd>{route.distanceKm ? `${route.distanceKm} km` : 'Not set'}</dd></div>
-                    <div><dt>ETA</dt><dd>{formatDateTime(route.estimatedArrivalAt)}</dd></div>
-                  </dl>
                 </div>
               ) : (
-                <p className="empty-state compact-state">No Route Plan is linked yet.</p>
+                <EmptyState compact message="No route plan is linked yet." title="No route" />
               )}
             </section>
+          </div>
 
-            <section className="content-panel wide" aria-labelledby="tracking-detail-heading">
-              <div className="section-heading">
-                <h2 id="tracking-detail-heading">Tracking timeline</h2>
-                <span>{history.length} events</span>
-              </div>
-              {history.length === 0 ? (
-                <p className="empty-state compact-state">No Tracking events have been recorded.</p>
-              ) : (
-                <ol className="timeline">
-                  {history.map((event) => (
-                    <li key={event.trackingEventId}>
-                      <div>
-                        <strong>{event.eventLabel || formatStatus(event.eventType)}</strong>
-                        <span>{formatDateTime(event.occurredAt)}</span>
-                      </div>
-                      <p>{event.notes || formatStatus(event.shipmentLifecycleStatus || event.eventType)}</p>
-                      {event.location ? (
-                        <small>{event.location.label || `${event.location.lat}, ${event.location.lng}`}</small>
-                      ) : null}
-                    </li>
-                  ))}
-                </ol>
-              )}
-            </section>
+          <section className="panel">
+            <SectionHeader eyebrow={`${history.length} events`} title="Tracking timeline" />
+            <Timeline events={history} />
+          </section>
 
-            <section className="content-panel" aria-labelledby="goods-heading">
-              <div className="section-heading">
-                <h2 id="goods-heading">Goods and items</h2>
-                <span>{asArray(state.shipment.goods).length} goods groups</span>
+          <div className="panel-grid equal">
+            <section className="panel">
+              <div className="panel-heading">
+                <div>
+                  <span>Goods</span>
+                  <h2>Goods and items</h2>
+                </div>
+                <span>{asArray(state.shipment.goods).length} groups</span>
               </div>
               {asArray(state.shipment.goods).length === 0 ? (
-                <p className="empty-state compact-state">No goods registered.</p>
+                <EmptyState compact message="No goods have been registered for this shipment." />
               ) : (
-                <ul className="stack-list">
+                <ul className="split-list">
                   {state.shipment.goods.map((goods) => (
                     <li key={goods.goodsId}>
-                      <span>{compactId(goods.goodsId)}</span>
-                      <strong>{goods.totalWeightKG} kg / {goods.totalVolumeM3} m3</strong>
-                      <small>{asArray(goods.items).length} items</small>
+                      <div>
+                        <strong>{compactId(goods.goodsId)}</strong>
+                        <small>{goods.totalWeightKG} kg / {goods.totalVolumeM3} m3 / {asArray(goods.items).length} items</small>
+                      </div>
                     </li>
                   ))}
                 </ul>
               )}
             </section>
 
-            <section className="content-panel" aria-labelledby="notifications-heading">
-              <div className="section-heading">
-                <h2 id="notifications-heading">Notifications</h2>
-                <span>{state.notifications.length} for receiver</span>
+            <section className="panel">
+              <div className="panel-heading">
+                <div>
+                  <span>Notifications</span>
+                  <h2>Receiver alerts</h2>
+                </div>
+                <span>{state.notifications.length} records</span>
               </div>
               {state.notifications.length === 0 ? (
-                <p className="empty-state compact-state">No notifications for this ReceiverCustomer.</p>
+                <EmptyState compact message="No receiver notifications are linked." />
               ) : (
-                <ul className="stack-list">
-                  {state.notifications.slice(0, 5).map((notification) => (
+                <ul className="split-list">
+                  {state.notifications.slice(0, 6).map((notification) => (
                     <li key={notification.notificationId || notification.id}>
-                      <span>{formatStatus(notification.type || notification.recipientRole)}</span>
-                      <strong>{notification.title || notification.message || 'Notification'}</strong>
-                      <small>{formatDateTime(notification.createdAt)}</small>
+                      <div>
+                        <strong>{notification.title || notification.message || 'Notification'}</strong>
+                        <small>{formatStatus(notification.type || notification.recipientRole)} / {formatDateTime(notification.createdAt)}</small>
+                      </div>
                     </li>
                   ))}
                 </ul>
               )}
             </section>
           </div>
-        )}
-      </section>
-    </main>
+        </>
+      ) : null}
+    </AppShell>
   )
 }

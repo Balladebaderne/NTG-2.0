@@ -7,3 +7,15 @@ export function listShipments({ token, filters } = {}) {
 export function getShipment(shipmentId, { token } = {}) {
   return apiRequest(`/shipments/${encodeURIComponent(shipmentId)}`, { token })
 }
+
+export function createShipment(shipment, { token } = {}) {
+  return apiRequest('/shipments', { body: shipment, token })
+}
+
+export function updateShipment(shipmentId, shipment, { token } = {}) {
+  return apiRequest(`/shipments/${encodeURIComponent(shipmentId)}`, {
+    body: shipment,
+    method: 'PUT',
+    token,
+  })
+}

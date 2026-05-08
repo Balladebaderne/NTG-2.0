@@ -40,6 +40,7 @@ Handles user authentication and issues JWT tokens for the NTG platform.
 |-------|----------|------|
 | `admin@ntg.local` | `admin123` | Admin |
 | `driver@ntg.local` | `driver123` | Driver |
+| `customer@ntg.local` | `customer123` | Customer |
 | `support@ntg.local` | `support123` | Customer Support |
 | `logistics@ntg.local` | `logistics123` | Logistical Management |
 

@@ -7,3 +7,11 @@ export function listDrivers({ token, available } = {}) {
 export function getDriver(driverId, { token } = {}) {
   return apiRequest(`/drivers/${encodeURIComponent(driverId)}`, { token })
 }
+
+export function updateDriverAvailability(driverId, available, { token } = {}) {
+  return apiRequest(`/drivers/${encodeURIComponent(driverId)}/availability`, {
+    body: { available },
+    method: 'PATCH',
+    token,
+  })
+}

@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { login } from '../clients/authClient'
+import { BrandMark } from '../components/PortalLayout'
 
 export function LoginPage({ onAuthenticated }) {
   const [email, setEmail] = useState('')
@@ -20,11 +21,7 @@ export function LoginPage({ onAuthenticated }) {
     setIsSubmitting(true)
 
     try {
-      const nextSession = await login({
-        email,
-        password,
-      })
-
+      const nextSession = await login({ email, password })
       setPassword('')
       onAuthenticated(nextSession.token)
     } catch (loginError) {
@@ -35,79 +32,77 @@ export function LoginPage({ onAuthenticated }) {
   }
 
   return (
-    <main className="app-shell">
-      <section className="brand-panel" aria-labelledby="page-title">
-        <div className="brand-mark" aria-hidden="true">
-          NTG
-        </div>
-        <h1 id="page-title">NTG operations</h1>
-        <p className="brand-copy">
-          Lorem ipsum dolor sit amet.
-        </p>
-
-        <div className="status-grid" aria-label="Login capabilities">
-          <span>Lorem, ipsum.</span>
-          <span>Lorem.</span>
-          <span>Lorem, ipsum dolor.</span>
-          <span>lorem.</span>
-        </div>
-      </section>
-
-      <section className="login-panel" aria-labelledby="login-title">
-        <div className="panel-heading">
-          <div>
-            <p className="eyebrow">Welcome back</p>
-            <h2 id="login-title">Sign in</h2>
+    <main className="login-page">
+      <div className="login-layout">
+        <section className="login-brand-panel" aria-labelledby="page-title">
+          <BrandMark />
+          <p className="eyebrow">NTG role portal</p>
+          <h1 id="page-title">Transport visibility for every shipment</h1>
+          <p>
+            A corporate logistics workspace for customers, drivers, and NTG operators to keep shipment status,
+            events, ETA, and support context connected.
+          </p>
+          <div className="login-capability-grid" aria-label="Portal areas">
+            <span>Customer shipment overview</span>
+            <span>Driver event updates</span>
+            <span>Operator control tower</span>
+            <span>Tracking timeline</span>
           </div>
-        </div>
+        </section>
 
-        <form className="login-form" onSubmit={handleSubmit} noValidate>
-          <div className="field">
-            <label htmlFor="email">Email</label>
-            <input
-              autoComplete="email"
-              id="email"
-              inputMode="email"
-              onChange={(event) => setEmail(event.target.value)}
-              placeholder="name@company.com"
-              type="email"
-              value={email}
-            />
-          </div>
-
-          <div className="field">
-            <label htmlFor="password">Password</label>
-            <div className="password-control">
-              <input
-                autoComplete="current-password"
-                id="password"
-                onChange={(event) => setPassword(event.target.value)}
-                placeholder="Enter password"
-                type={showPassword ? 'text' : 'password'}
-                value={password}
-              />
-              <button
-                aria-label={showPassword ? 'Hide password' : 'Show password'}
-                className="password-toggle"
-                onClick={() => setShowPassword((value) => !value)}
-                type="button"
-              >
-                {showPassword ? 'Hide' : 'Show'}
-              </button>
+        <section className="login-panel" aria-labelledby="login-title">
+          <div className="login-panel-inner">
+            <div>
+              <p className="eyebrow">Welcome back</p>
+              <h2 id="login-title">Sign in</h2>
+              <p>Access the NTG workspace assigned to your account role.</p>
             </div>
+
+            <form className="login-form" onSubmit={handleSubmit} noValidate>
+              <label className="field">
+                <span>Email</span>
+                <input
+                  autoComplete="email"
+                  id="email"
+                  inputMode="email"
+                  onChange={(event) => setEmail(event.target.value)}
+                  placeholder="name@company.com"
+                  type="email"
+                  value={email}
+                />
+              </label>
+
+              <label className="field">
+                <span>Password</span>
+                <div className="password-control">
+                  <input
+                    autoComplete="current-password"
+                    id="password"
+                    onChange={(event) => setPassword(event.target.value)}
+                    placeholder="Enter password"
+                    type={showPassword ? 'text' : 'password'}
+                    value={password}
+                  />
+                  <button
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                    className="password-toggle"
+                    onClick={() => setShowPassword((value) => !value)}
+                    type="button"
+                  >
+                    {showPassword ? 'Hide' : 'Show'}
+                  </button>
+                </div>
+              </label>
+
+              {error ? <p className="form-error" role="alert">{error}</p> : null}
+
+              <button className="button-primary" disabled={isSubmitting} type="submit">
+                {isSubmitting ? 'Signing in' : 'Sign in'}
+              </button>
+            </form>
           </div>
-
-          {error ? (
-            <p className="form-error" role="alert">
-              {error}
-            </p>
-          ) : null}
-
-          <button className="primary-button" disabled={isSubmitting} type="submit">
-            {isSubmitting ? 'Signing in...' : 'Sign in'}
-          </button>
-        </form>
-      </section>
+        </section>
+      </div>
     </main>
   )
 }
