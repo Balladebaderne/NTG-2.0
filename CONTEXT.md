@@ -36,6 +36,18 @@ _Avoid_: Status, online, active
 A customer-facing visualization of the path a Shipment will travel, exposed to CustomerService and CustomerSupportService. Not used by the Driver to navigate — Drivers use their own external routing system (out of scope).
 _Avoid_: Trip, journey, path, driver assignment
 
+**EstimatedArrival**:
+The time NTG expects a Shipment to arrive at the ReceiverCustomer.
+_Avoid_: ETA (without defining it), delivery time, route time
+
+**Delay**:
+A Shipment condition where the Shipment is no longer expected to arrive when the ReceiverCustomer was told to expect it.
+_Avoid_: Late status, problem, exception
+
+**Notification**:
+A customer-facing message sent to a ReceiverCustomer about a Shipment that needs their attention.
+_Avoid_: Alert, email, message (without qualifier)
+
 **CustomerSupportAgent**:
 A platform operator who books Shipments on behalf of Senders and ReceiverCustomers, and assigns available Drivers to unassigned Shipments.
 _Avoid_: Operator, admin, dispatcher
@@ -55,6 +67,9 @@ _Avoid_: Status update, tracking event, partial event
 - A **Goods** contains one or more **Items**
 - A **Route** is associated with a **Shipment** for customer-facing visualization
 - A **Driver** is assigned directly to a **Shipment** (not through a Route)
+- A **Shipment** has zero or one **EstimatedArrival**
+- A **Delay** belongs to one **Shipment**
+- A **Notification** is sent to one **ReceiverCustomer** about one **Shipment**
 
 ## Shipment lifecycle
 

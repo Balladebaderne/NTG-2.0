@@ -21,6 +21,7 @@ const ShipmentSchema = new mongoose.Schema({
   receiverCustomerId:        { type: String, required: true },
   createdByCustomerServiceId:{ type: String, required: true },
   routeId:                   { type: String, default: null },
+  estimatedArrivalAt:        { type: Date, default: null },
   goods:                     { type: [GoodsSchema], default: [] },
 }, { timestamps: true })
 
