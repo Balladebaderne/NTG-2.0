@@ -1,5 +1,6 @@
 const config = require('../config')
 const { computeRoute } = require('./googleRoutesClient')
+const { geocodeAddress } = require('./nominatimClient')
 
 function isGoogleCalculationEnabled() {
   return config.routeCalculationProvider === 'google' && Boolean(config.googleMapsApiKey)
@@ -59,14 +60,43 @@ function applyRouteCalculationFailure(routeInput, err) {
   }
 }
 
+async function fillLocation(item) {
+  if (item.location || !item.address) return item
+  try {
+    const location = await geocodeAddress(item.address)
+    return location ? { ...item, location: { lat: location.lat, lng: location.lng } } : item
+  } catch {
+    return item
+  }
+}
+
+// Geocode any origin, destination, or stop that lacks lat/lng coordinates.
+// Best-effort — a failed lookup is silently ignored so route creation still succeeds.
+async function geocodeRouteLocations(routeInput) {
+  const [origin, destination, ...stops] = await Promise.all([
+    fillLocation(routeInput.origin),
+    fillLocation(routeInput.destination),
+    ...routeInput.stops.map(fillLocation),
+  ])
+  return { ...routeInput, origin, destination, stops }
+}
+
 async function enrichRouteInput(routeInput) {
-  if (!isGoogleCalculationEnabled()) return routeInput
+  // Populate missing coordinates from Nominatim (free, no key required).
+  let input = routeInput
+  try {
+    input = await geocodeRouteLocations(routeInput)
+  } catch {
+    // non-fatal — proceed with whatever locations we have
+  }
+
+  if (!isGoogleCalculationEnabled()) return input
 
   try {
-    return applyRouteCalculation(routeInput, await computeRoute(routeInput))
+    return applyRouteCalculation(input, await computeRoute(input))
   } catch (err) {
     if (config.routeCalculationRequired) throw err
-    return applyRouteCalculationFailure(routeInput, err)
+    return applyRouteCalculationFailure(input, err)
   }
 }
 
@@ -74,5 +104,6 @@ module.exports = {
   applyRouteCalculation,
   applyRouteCalculationFailure,
   enrichRouteInput,
+  geocodeRouteLocations,
   isGoogleCalculationEnabled,
 }

@@ -19,3 +19,10 @@ export function updateShipment(shipmentId, shipment, { token } = {}) {
     token,
   })
 }
+
+export function deleteShipment(shipmentId, { token } = {}) {
+  return apiRequest(`/shipments/${encodeURIComponent(shipmentId)}`, {
+    method: 'DELETE',
+    token,
+  })
+}

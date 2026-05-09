@@ -60,6 +60,18 @@ _Avoid_: Reward points, credits, score
 A Shipment status change that is not the final delivery (i.e. not `received`), used as a trigger for awarding a smaller number of LoyaltyPoints to the assigned Driver. Originates from the trackingService via the message broker.
 _Avoid_: Status update, tracking event, partial event
 
+**StopConfirmation**:
+A driver-reported fact that a planned Route Stop has been physically reached, recording the actual arrival time.
+_Avoid_: GPS update, live location ping, tracking event (that term belongs to trackingService)
+
+**ETADelta**:
+The time difference between a Driver's actual arrival at a Stop and the planned arrival at that Stop, applied forward to shift the Route's EstimatedArrival.
+_Avoid_: ETA recalculation, live ETA
+
+**PolylineProgress**:
+The visual representation of Route completion derived client-side by splitting the stored encoded polyline at the coordinates of the last confirmed Stop. Not stored by routeService.
+_Avoid_: Live GPS trace, animated route, server-side progress index
+
 ## Relationships
 
 - A **Shipment** is created by a **CustomerSupportAgent** on behalf of a **Sender** and a **ReceiverCustomer**
