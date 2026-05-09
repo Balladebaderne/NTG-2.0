@@ -290,7 +290,7 @@ export function DriverDashboardPage({ onNavigate, onSignOut, profile, token }) {
   const firstName = profile?.name?.split(' ')[0] || 'chauffør'
 
   return (
-    <AppShell active="driver-dashboard" onNavigate={onNavigate} onSignOut={onSignOut} profile={profile}>
+    <AppShell active="driver-dashboard" onNavigate={onNavigate} onSignOut={onSignOut} profile={profile} token={token}>
       <div className="driver-greeting">
         <h1>{greeting}, {firstName}</h1>
         <p className="driver-greeting-sub">
@@ -373,7 +373,7 @@ export function DriverAssignedShipmentsPage({ onNavigate, onSignOut, profile, to
   const state = useDriverData({ profile, token })
 
   return (
-    <AppShell active="driver-assigned" onNavigate={onNavigate} onSignOut={onSignOut} profile={profile}>
+    <AppShell active="driver-assigned" onNavigate={onNavigate} onSignOut={onSignOut} profile={profile} token={token}>
       <div className="driver-greeting">
         <h1>Mine sendinger</h1>
         <p className="driver-greeting-sub">
@@ -422,7 +422,7 @@ export function DriverShipmentUpdatePage({ onNavigate, onSignOut, profile, shipm
   )
 
   return (
-    <AppShell active="driver-assigned" onNavigate={onNavigate} onSignOut={onSignOut} profile={profile}>
+    <AppShell active="driver-assigned" onNavigate={onNavigate} onSignOut={onSignOut} profile={profile} token={token}>
       <div className="driver-greeting">
         <button
           className="driver-back-btn"
@@ -470,7 +470,7 @@ export function DriverEventsPage({ onNavigate, onSignOut, profile, token }) {
   const state = useDriverData({ profile, token })
 
   return (
-    <AppShell active="driver-events" onNavigate={onNavigate} onSignOut={onSignOut} profile={profile}>
+    <AppShell active="driver-events" onNavigate={onNavigate} onSignOut={onSignOut} profile={profile} token={token}>
       <section className="workspace-hero">
         <div>
           <p className="eyebrow">Route events</p>
@@ -530,7 +530,7 @@ export function DriverLoyaltyPage({ onNavigate, onSignOut, profile, token }) {
     : 'Max tier'
 
   return (
-    <AppShell active="driver-loyalty" onNavigate={onNavigate} onSignOut={onSignOut} profile={profile}>
+    <AppShell active="driver-loyalty" onNavigate={onNavigate} onSignOut={onSignOut} profile={profile} token={token}>
       <section className="workspace-hero">
         <div>
           <p className="eyebrow">Driver rewards</p>

@@ -103,6 +103,9 @@ services:
       - PORT=5000
       - MONGODB_URI=mongodb://shipments_db:27017/shipments_db
       - DRIVER_SERVICE_URL=http://driver-service:5001
+      - AUTH_REQUIRED=true
+      - JWT_SECRET=local-login-secret-change-me
+      - SERVICE_AUTH_TOKEN=local-service-token-change-me
     depends_on:
       - shipments_db
     networks:
@@ -145,6 +148,9 @@ services:
       - RABBITMQ_PORT=5672
       - RABBITMQ_USER=guest
       - RABBITMQ_PASS=guest
+      - AUTH_REQUIRED=true
+      - JWT_SECRET=local-login-secret-change-me
+      - SERVICE_AUTH_TOKEN=local-service-token-change-me
     depends_on:
       tracking_db:
         condition: service_healthy
@@ -193,6 +199,9 @@ services:
       - GOOGLE_MAPS_API_KEY=${GOOGLE_MAPS_API_KEY:-AIzaSyCfVQgCV8rQjV4EjnkevYoae4hFjyZ4SL0}
       - ROUTE_CALCULATION_PROVIDER=google
       - ROUTE_CALCULATION_REQUIRED=false
+      - AUTH_REQUIRED=true
+      - JWT_SECRET=local-login-secret-change-me
+      - SERVICE_AUTH_TOKEN=local-service-token-change-me
     depends_on:
       route_db:
         condition: service_healthy
@@ -235,6 +244,9 @@ services:
     environment:
       - PORT=5001
       - DATABASE_URL=postgres://postgres:postgres@driver_db:5432/driver_db
+      - AUTH_REQUIRED=true
+      - JWT_SECRET=local-login-secret-change-me
+      - SERVICE_AUTH_TOKEN=local-service-token-change-me
     depends_on:
       driver_db:
         condition: service_healthy
@@ -331,6 +343,9 @@ services:
       - SHIPMENTS_SERVICE_URL=http://shipments-service:5000
       - DELAY_POLLING_ENABLED=true
       - DELAY_POLLING_INTERVAL_MS=60000
+      - AUTH_REQUIRED=true
+      - JWT_SECRET=local-login-secret-change-me
+      - SERVICE_AUTH_TOKEN=local-service-token-change-me
     depends_on:
       - notification_db
       - shipments-service
@@ -475,6 +490,9 @@ services:
       - PORT=5002
       - MONGODB_URI=mongodb://customer_support_db:27017/customer_support_db
       - SHIPMENTS_SERVICE_URL=http://shipments-service:5000
+      - AUTH_REQUIRED=true
+      - JWT_SECRET=local-login-secret-change-me
+      - SERVICE_AUTH_TOKEN=local-service-token-change-me
     depends_on:
       - customer_support_db
       - shipments-service

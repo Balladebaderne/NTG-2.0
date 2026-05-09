@@ -93,7 +93,7 @@ export function CustomerDashboardPage({ onNavigate, onSignOut, profile, token })
   ], [state.shipments, state.notifications])
 
   return (
-    <AppShell active="customer-dashboard" onNavigate={onNavigate} onSignOut={onSignOut} profile={profile}>
+    <AppShell active="customer-dashboard" onNavigate={onNavigate} onSignOut={onSignOut} profile={profile} token={token}>
       <section className="workspace-hero">
         <div>
           <p className="eyebrow">Customer shipment overview</p>
@@ -157,7 +157,7 @@ export function CustomerShipmentsPage({ onNavigate, onSignOut, profile, token })
   }, [filters, state.shipments])
 
   return (
-    <AppShell active="customer-shipments" onNavigate={onNavigate} onSignOut={onSignOut} profile={profile}>
+    <AppShell active="customer-shipments" onNavigate={onNavigate} onSignOut={onSignOut} profile={profile} token={token}>
       <section className="workspace-hero">
         <div>
           <p className="eyebrow">My shipments</p>
@@ -228,7 +228,7 @@ export function CustomerSupportPage({ onNavigate, onSignOut, profile, token }) {
   }
 
   return (
-    <AppShell active="customer-support" onNavigate={onNavigate} onSignOut={onSignOut} profile={profile}>
+    <AppShell active="customer-support" onNavigate={onNavigate} onSignOut={onSignOut} profile={profile} token={token}>
       <section className="workspace-hero">
         <div>
           <p className="eyebrow">Contact NTG</p>

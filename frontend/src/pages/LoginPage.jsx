@@ -42,9 +42,9 @@ export function LoginPage({ onAuthenticated }) {
 
           <div className="login-brand-body">
             <p className="eyebrow">NTG Portal</p>
-            <h1 id="page-title">Vi hjælper dit gods på vej</h1>
+            <h1 id="page-title">We keep your cargo moving</h1>
             <p>
-              Global transport og logistik fra vejtransport til søfragt — samlet i ét workspace for kunder, chauffører og operatører.
+              Global transport and logistics, from road freight to ocean freight — brought together in one workspace for customers, drivers, and operators.
             </p>
           </div>
 
@@ -52,23 +52,23 @@ export function LoginPage({ onAuthenticated }) {
             <div className="login-stats">
               <div className="login-stat">
                 <strong>100+</strong>
-                <span>Lande</span>
+                <span>Countries</span>
               </div>
               <div className="login-stat">
                 <strong>3.500+</strong>
-                <span>Medarbejdere</span>
+                <span>Employees</span>
               </div>
               <div className="login-stat">
                 <strong>1991</strong>
-                <span>Grundlagt</span>
+                <span>Founded</span>
               </div>
             </div>
             <div className="login-services">
-              <span>Vejtransport</span>
-              <span>Søfragt</span>
-              <span>Luftfragt</span>
+              <span>Road freight</span>
+              <span>Ocean freight</span>
+              <span>Air freight</span>
               <span>Express</span>
-              <span>Lagerlogistik</span>
+              <span>Warehouse logistics</span>
             </div>
           </div>
         </section>

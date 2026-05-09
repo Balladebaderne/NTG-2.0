@@ -74,6 +74,18 @@ img {
   max-width: 100%;
 }
 
+.sr-only {
+  border: 0;
+  clip: rect(0 0 0 0);
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  padding: 0;
+  position: absolute;
+  white-space: nowrap;
+  width: 1px;
+}
+
 address {
   font-style: normal;
 }
@@ -416,6 +428,7 @@ address {
 .button-secondary:focus-visible,
 .button-neutral:focus-visible,
 .brand-lockup-button:focus-visible,
+.notification-trigger:focus-visible,
 .site-nav button:focus-visible,
 .link-button:focus-visible,
 .field input:focus,
@@ -1858,6 +1871,217 @@ p {
 
 /* ─── Read badge for notifications ─── */
 
+.notification-inbox {
+  flex: 0 0 auto;
+  position: relative;
+}
+
+.notification-trigger {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: var(--radius-small);
+  color: #ffffff;
+  display: inline-flex;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0;
+  position: relative;
+  transition: background-color 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+  width: 44px;
+}
+
+.notification-trigger:hover,
+.notification-trigger[aria-expanded="true"] {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.46);
+}
+
+.notification-trigger .icon {
+  height: 20px;
+  width: 20px;
+}
+
+.notification-count-badge {
+  align-items: center;
+  background: var(--color-accent-green);
+  border: 2px solid var(--color-primary-navy);
+  border-radius: 999px;
+  color: var(--color-dark-navy);
+  display: inline-flex;
+  font-size: 0.68rem;
+  font-weight: 900;
+  justify-content: center;
+  line-height: 1;
+  min-height: 19px;
+  min-width: 19px;
+  padding: 0 5px;
+  position: absolute;
+  right: -7px;
+  top: -7px;
+}
+
+.notification-popover {
+  background: #ffffff;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-medium);
+  box-shadow: var(--shadow-large);
+  color: var(--color-text-main);
+  max-width: calc(100vw - 32px);
+  outline: none;
+  overflow: hidden;
+  position: absolute;
+  right: 0;
+  top: calc(100% + 12px);
+  width: 360px;
+  z-index: 100;
+}
+
+.notification-popover:focus-visible {
+  box-shadow: var(--shadow-large), 0 0 0 3px rgba(62, 154, 215, 0.18);
+}
+
+.notification-popover-header {
+  align-items: center;
+  border-bottom: 1px solid var(--color-border);
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  padding: 14px;
+}
+
+.notification-popover-header span {
+  color: var(--color-text-muted);
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.notification-popover-header strong {
+  color: var(--color-text-main);
+  display: block;
+  font-size: 1rem;
+}
+
+.notification-popover-body {
+  max-height: min(430px, 70dvh);
+  overflow-y: auto;
+}
+
+.notification-state-message {
+  color: var(--color-text-muted);
+  line-height: 1.5;
+  margin: 0;
+  padding: 18px;
+}
+
+.notification-error {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+}
+
+.notification-error p {
+  background: var(--color-accent-red-soft);
+  border: 1px solid rgba(215, 25, 32, 0.24);
+  border-radius: var(--radius-small);
+  color: var(--color-accent-red-dark);
+  font-weight: 750;
+  line-height: 1.45;
+  margin: 0;
+  padding: 10px 12px;
+}
+
+.notification-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.notification-item {
+  border-bottom: 1px solid var(--color-border);
+  display: grid;
+  gap: 9px;
+  padding: 14px;
+}
+
+.notification-item:last-child {
+  border-bottom: 0;
+}
+
+.notification-item.is-unread {
+  background: #f8fbfd;
+  border-left: 3px solid var(--color-accent-green);
+  padding-left: 11px;
+}
+
+.notification-item-top {
+  align-items: start;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.notification-item-top strong {
+  color: var(--color-text-main);
+  display: block;
+  font-size: 0.94rem;
+  line-height: 1.35;
+}
+
+.notification-item-top time {
+  color: var(--color-text-muted);
+  font-size: 0.76rem;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.notification-read-state,
+.notification-object-label {
+  border-radius: var(--radius-small);
+  display: inline-flex;
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1.2;
+  padding: 4px 7px;
+}
+
+.notification-read-state {
+  background: var(--color-section-bg);
+  color: var(--color-text-muted);
+  margin-top: 5px;
+}
+
+.notification-item.is-unread .notification-read-state {
+  background: rgba(155, 205, 47, 0.18);
+  color: var(--color-dark-navy);
+}
+
+.notification-item p {
+  color: var(--color-text-main);
+  font-size: 0.88rem;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.notification-item-footer {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+}
+
+.notification-object-label {
+  background: var(--color-accent-blue-soft);
+  color: var(--color-primary-navy);
+}
+
+.notification-mark-read {
+  flex: 0 0 auto;
+}
+
 .read-badge {
   background: var(--color-section-bg);
   border-radius: var(--radius-small);
@@ -1866,6 +2090,46 @@ p {
   font-weight: 700;
   padding: 4px 8px;
   white-space: nowrap;
+}
+
+@media (max-width: 700px) {
+  .profile-actions.has-notification-inbox {
+    align-items: center;
+    grid-template-columns: 44px minmax(0, 1fr);
+  }
+
+  .profile-actions.has-notification-inbox > .button-secondary {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+
+  .notification-popover {
+    border-radius: var(--radius-medium);
+    left: 14px;
+    max-height: calc(100dvh - 28px);
+    max-width: none;
+    position: fixed;
+    right: 14px;
+    top: 14px;
+    width: auto;
+  }
+
+  .notification-popover-body {
+    max-height: calc(100dvh - 108px);
+  }
+
+  .notification-item-top {
+    grid-template-columns: 1fr;
+  }
+
+  .notification-item-top time {
+    white-space: normal;
+  }
+
+  .notification-item-footer {
+    align-items: stretch;
+    display: grid;
+  }
 }
 
 /* ─── Ticket status inline select ─── */
