@@ -157,13 +157,14 @@ function OperatorHero({ children, onRefresh, state, title }) {
 }
 
 function AssignmentPanel({ onAssigned, state, token }) {
+  const availableDrivers = state.drivers.filter((driver) => driver.available)
   const [form, setForm] = useState({ driverId: '', shipmentId: '' })
   const [message, setMessage] = useState('')
   const [busy, setBusy] = useState(false)
 
   useEffect(() => {
     setForm((current) => ({
-      driverId: current.driverId || state.drivers[0]?.id || '',
+      driverId: current.driverId || availableDrivers[0]?.id || '',
       shipmentId: current.shipmentId || state.shipments[0]?._id || '',
     }))
   }, [state.drivers, state.shipments])
@@ -200,14 +201,18 @@ function AssignmentPanel({ onAssigned, state, token }) {
       </label>
       <label className="field">
         <span>Driver</span>
-        <select onChange={(event) => setForm((current) => ({ ...current, driverId: event.target.value }))} value={form.driverId}>
-          {state.drivers.map((driver) => (
-            <option key={driver.id} value={driver.id}>{driver.name} / {driver.available ? 'Available' : 'Unavailable'}</option>
-          ))}
-        </select>
+        {availableDrivers.length === 0 ? (
+          <Notice tone="warning">No drivers are currently available.</Notice>
+        ) : (
+          <select onChange={(event) => setForm((current) => ({ ...current, driverId: event.target.value }))} value={form.driverId}>
+            {availableDrivers.map((driver) => (
+              <option key={driver.id} value={driver.id}>{driver.name}</option>
+            ))}
+          </select>
+        )}
       </label>
       {message ? <Notice tone={message.includes('assigned') ? 'subtle' : 'warning'}>{message}</Notice> : null}
-      <button className="button-primary" disabled={busy || state.shipments.length === 0 || state.drivers.length === 0} type="submit">
+      <button className="button-primary" disabled={busy || state.shipments.length === 0 || availableDrivers.length === 0} type="submit">
         {busy ? 'Assigning' : 'Assign driver'}
       </button>
     </form>
@@ -296,7 +301,7 @@ function CreateShipmentForm({ onCreated, profile, state, token }) {
           <span>Driver assignment</span>
           <select onChange={(event) => updateField('driverId', event.target.value)} value={form.driverId}>
             <option value="">Assign later</option>
-            {state.drivers.map((driver) => (
+            {state.drivers.filter((driver) => driver.available).map((driver) => (
               <option key={driver.id} value={driver.id}>{driver.name}</option>
             ))}
           </select>
@@ -344,7 +349,7 @@ export function OperatorDashboardPage({ onNavigate, onSignOut, profile, token })
   }))).slice(0, 6)
 
   return (
-    <AppShell active="operator-dashboard" onNavigate={onNavigate} onSignOut={onSignOut} profile={profile}>
+    <AppShell active="operator-dashboard" onNavigate={onNavigate} onSignOut={onSignOut} profile={profile} token={token}>
       <OperatorHero onRefresh={state.loadOperatorData} state={state} title="Control tower">
         Operational overview for shipments, events, driver capacity, exceptions, customer records, and support escalation.
       </OperatorHero>
@@ -428,7 +433,7 @@ export function OperatorShipmentsPage({ onNavigate, onSignOut, profile, token })
   }, [filters, state.shipments])
 
   return (
-    <AppShell active="operator-shipments" onNavigate={onNavigate} onSignOut={onSignOut} profile={profile}>
+    <AppShell active="operator-shipments" onNavigate={onNavigate} onSignOut={onSignOut} profile={profile} token={token}>
       <OperatorHero onRefresh={state.loadOperatorData} state={state} title="Shipment management">
         Manage shipment status, route linkage, driver assignment, ETA, customer context, and operational actions.
       </OperatorHero>
@@ -469,7 +474,7 @@ export function OperatorCreateShipmentPage({ onNavigate, onSignOut, profile, tok
   const state = useOperatorData({ token })
 
   return (
-    <AppShell active="operator-create" onNavigate={onNavigate} onSignOut={onSignOut} profile={profile}>
+    <AppShell active="operator-create" onNavigate={onNavigate} onSignOut={onSignOut} profile={profile} token={token}>
       <OperatorHero onRefresh={state.loadOperatorData} state={state} title="Create shipment">
         Register a shipment order with customer, sender, cargo, ETA, and optional driver assignment.
       </OperatorHero>
@@ -506,7 +511,7 @@ export function OperatorDriversPage({ onNavigate, onSignOut, profile, token }) {
   }
 
   return (
-    <AppShell active="operator-drivers" onNavigate={onNavigate} onSignOut={onSignOut} profile={profile}>
+    <AppShell active="operator-drivers" onNavigate={onNavigate} onSignOut={onSignOut} profile={profile} token={token}>
       <OperatorHero onRefresh={state.loadOperatorData} state={state} title="Driver capacity">
         Monitor available drivers and capacity signals used when assigning shipments.
       </OperatorHero>
@@ -542,7 +547,7 @@ export function OperatorCustomersPage({ onNavigate, onSignOut, profile, token })
   const state = useOperatorData({ token })
 
   return (
-    <AppShell active="operator-customers" onNavigate={onNavigate} onSignOut={onSignOut} profile={profile}>
+    <AppShell active="operator-customers" onNavigate={onNavigate} onSignOut={onSignOut} profile={profile} token={token}>
       <OperatorHero onRefresh={state.loadOperatorData} state={state} title="Customers and senders">
         Reference view for customer and sender master data connected to shipment records.
       </OperatorHero>
@@ -612,7 +617,7 @@ export function OperatorEventsPage({ onNavigate, onSignOut, profile, token }) {
   }
 
   return (
-    <AppShell active="operator-events" onNavigate={onNavigate} onSignOut={onSignOut} profile={profile}>
+    <AppShell active="operator-events" onNavigate={onNavigate} onSignOut={onSignOut} profile={profile} token={token}>
       <OperatorHero onRefresh={state.loadOperatorData} state={state} title="Event monitoring">
         View tracking history, delay signals, notification scans, and route event health across active shipments.
       </OperatorHero>

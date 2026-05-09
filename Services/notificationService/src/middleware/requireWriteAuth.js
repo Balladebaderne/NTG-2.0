@@ -22,7 +22,7 @@ function requireWriteAuth(req, res, next) {
   try {
     req.user = jwt.verify(token, process.env.JWT_SECRET || 'local-login-secret-change-me')
     if (!OPERATOR_WRITE_ROLES.has(normalizeRole(req.user.role))) {
-      return res.status(403).json({ error: 'Role is not permitted to modify routes' })
+      return res.status(403).json({ error: 'Role is not permitted to modify notifications' })
     }
 
     return next()

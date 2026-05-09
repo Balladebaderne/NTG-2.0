@@ -1,15 +1,105 @@
 require('./setup')
+const jwt = require('jsonwebtoken')
 const request = require('supertest')
 const app = require('../app')
 const Shipment = require('../models/Shipment')
 
+const TEST_SECRET = 'shipments-test-secret'
 const validShipment = {
   senderId: 'sender-1',
   receiverCustomerId: 'customer-1',
   createdByCustomerServiceId: 'agent-1',
 }
 
+function tokenFor(role) {
+  return jwt.sign(
+    {
+      email: `${role}@ntg.local`,
+      name: `NTG ${role}`,
+      role,
+      sub: `usr_${role}`,
+    },
+    TEST_SECRET
+  )
+}
+
+function bearer(role) {
+  return `Bearer ${tokenFor(role)}`
+}
+
 describe('Shipments API', () => {
+  describe('write authorization', () => {
+    beforeEach(() => {
+      process.env.AUTH_REQUIRED = 'true'
+      process.env.JWT_SECRET = TEST_SECRET
+      delete process.env.SERVICE_AUTH_TOKEN
+    })
+
+    afterEach(() => {
+      delete process.env.AUTH_REQUIRED
+      delete process.env.JWT_SECRET
+      delete process.env.SERVICE_AUTH_TOKEN
+    })
+
+    it('rejects shipment creation without a token', async () => {
+      const res = await request(app).post('/shipments').send(validShipment)
+
+      expect(res.status).toBe(401)
+      expect(res.body.error).toBe('Authentication required')
+    })
+
+    it('rejects shipment creation for customer and driver roles', async () => {
+      for (const role of ['customer', 'driver']) {
+        const res = await request(app)
+          .post('/shipments')
+          .set('Authorization', bearer(role))
+          .send(validShipment)
+
+        expect(res.status).toBe(403)
+        expect(res.body.error).toBe('Role is not permitted to modify shipments')
+      }
+    })
+
+    it('allows shipment creation for admin, logistics, and support roles', async () => {
+      for (const role of ['admin', 'logistics', 'support']) {
+        const res = await request(app)
+          .post('/shipments')
+          .set('Authorization', bearer(role))
+          .send(validShipment)
+
+        expect(res.status).toBe(201)
+        expect(res.body._id).toBeDefined()
+      }
+    })
+
+    it('rejects driver assignment for non-operator roles', async () => {
+      const created = await request(app)
+        .post('/shipments')
+        .set('Authorization', bearer('admin'))
+        .send(validShipment)
+
+      const res = await request(app)
+        .put(`/shipments/${created.body._id}`)
+        .set('Authorization', bearer('customer'))
+        .send({ driverId: 'driver-uuid-1' })
+
+      expect(res.status).toBe(403)
+      expect(res.body.error).toBe('Role is not permitted to modify shipments')
+    })
+
+    it('allows internal service-token writes', async () => {
+      process.env.SERVICE_AUTH_TOKEN = 'test-service-token'
+
+      const res = await request(app)
+        .post('/shipments')
+        .set('x-service-token', 'test-service-token')
+        .send(validShipment)
+
+      expect(res.status).toBe(201)
+      expect(res.body._id).toBeDefined()
+    })
+  })
+
   describe('POST /shipments', () => {
     it('creates a shipment with status booked', async () => {
       const res = await request(app).post('/shipments').send(validShipment)

@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react'
+import { getDriver, updateDriverAvailability } from '../clients/driversClient'
 import { getDriverPoints } from '../clients/loyaltyClient'
 import { listShipments } from '../clients/shipmentsClient'
-import { createLocationUpdate, createTrackingEvent, getLatestTracking } from '../clients/trackingClient'
+import { createTrackingEvent, getLatestTracking } from '../clients/trackingClient'
 import {
   AppShell,
   EmptyState,
@@ -9,12 +10,8 @@ import {
   LoyaltyCard,
   Notice,
   ProgressBar,
-  ShipmentCard,
-  ShipmentTable,
-  StatCard,
   Timeline,
 } from '../components/PortalLayout'
-import { trackingMilestones } from '../data/ntgContent'
 import { asArray, compactId, formatDateTime, formatStatus } from '../utils/format'
 
 async function settle(label, task) {
@@ -29,31 +26,42 @@ function driverIdFor(profile) {
   return profile?.id || 'usr_driver'
 }
 
-function defaultEventForm(shipmentId = '') {
-  return {
-    eventType: 'goods_loaded_pickup_confirmed',
-    location: '',
-    notes: '',
-    occurredAt: new Date().toISOString().slice(0, 16),
-    shipmentId,
-  }
+const QUICK_ACTIONS = [
+  { eventType: 'goods_loaded_pickup_confirmed', label: 'Afhentning bekræftet', tone: 'blue', order: 50 },
+  { eventType: 'departed_origin_terminal', label: 'Afgang terminal', tone: 'blue', order: 70 },
+  { eventType: 'in_transit_milestone', label: 'Grænse passeret', tone: 'blue', order: 80, repeatable: true },
+  { eventType: 'arrived_destination_terminal', label: 'Ankomst terminal', tone: 'blue', order: 90 },
+  { eventType: 'goods_delivered', label: 'Leveret', tone: 'green', order: 120 },
+  { eventType: 'delay_logged', label: 'Forsinkelse', tone: 'warning', sideEvent: true },
+]
+
+// Orden hændelserne skal ske i (fra tracking service)
+const EVENT_ORDER = {
+  shipment_order_created: 10,
+  transport_planned_carrier_assigned: 20,
+  pickup_scheduled: 30,
+  truck_arrived_pickup: 40,
+  goods_loaded_pickup_confirmed: 50,
+  shipment_in_transit: 60,
+  departed_origin_terminal: 70,
+  in_transit_milestone: 80,
+  arrived_destination_terminal: 90,
+  out_for_delivery: 100,
+  truck_arrived_delivery: 110,
+  goods_delivered: 120,
 }
 
-function parseCoordinateLocation(value) {
-  const match = String(value || '').trim().match(/^(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)$/)
-  if (!match) return null
-
-  return {
-    label: value.trim(),
-    lat: Number(match[1]),
-    lng: Number(match[2]),
-  }
-}
-
-function notesWithLocation(notes, location) {
-  if (!location) return notes || undefined
-  return [notes, `Location: ${location}`].filter(Boolean).join('\n')
-}
+// Obligatoriske hændelser der automatisk oprettes hvis de mangler
+const REQUIRED_FLOW = [
+  { eventType: 'shipment_order_created', order: 10 },
+  { eventType: 'transport_planned_carrier_assigned', order: 20 },
+  { eventType: 'pickup_scheduled', order: 30 },
+  { eventType: 'truck_arrived_pickup', order: 40 },
+  { eventType: 'goods_loaded_pickup_confirmed', order: 50 },
+  { eventType: 'shipment_in_transit', order: 60 },
+  { eventType: 'out_for_delivery', order: 100 },
+  { eventType: 'truck_arrived_delivery', order: 110 },
+]
 
 function useDriverData({ profile, token }) {
   const [state, setState] = useState({
@@ -92,180 +100,269 @@ function useDriverData({ profile, token }) {
   return { ...state, loadDriverData }
 }
 
-function DriverEventForm({ initialShipmentId = '', onSaved, profile, shipments, token }) {
-  const [form, setForm] = useState(defaultEventForm(initialShipmentId || shipments[0]?._id || ''))
-  const [message, setMessage] = useState('')
-  const [isSaving, setIsSaving] = useState(false)
+function DriverQuickActions({ initialShipmentId, onSaved, profile, shipments, token, trackingByShipmentId }) {
+  const [selectedId, setSelectedId] = useState(initialShipmentId || shipments[0]?._id || '')
+  const [busy, setBusy] = useState(null)
+  const [result, setResult] = useState(null)
+  const [showNote, setShowNote] = useState(false)
+  const [note, setNote] = useState('')
 
   useEffect(() => {
-    setForm((current) => ({
-      ...current,
-      shipmentId: initialShipmentId || current.shipmentId || shipments[0]?._id || '',
-    }))
+    setSelectedId(initialShipmentId || shipments[0]?._id || '')
   }, [initialShipmentId, shipments])
 
-  async function handleSubmit(event) {
-    event.preventDefault()
-    setMessage('')
+  async function submitEvent(shipmentId, eventType, extraFields = {}) {
+    await createTrackingEvent(shipmentId, {
+      driverId: driverIdFor(profile),
+      eventType,
+      idempotencyKey: `auto-${shipmentId}-${eventType}`,
+      occurredAt: new Date().toISOString(),
+      ...extraFields,
+    }, { token })
+  }
 
-    if (!form.shipmentId || !form.eventType || !form.occurredAt) {
-      setMessage('Shipment, event type, and timestamp are required.')
-      return
-    }
-
-    setIsSaving(true)
-    const occurredAt = new Date(form.occurredAt).toISOString()
-    const location = parseCoordinateLocation(form.location)
-    if (form.eventType === 'location_updated' && !location) {
-      setMessage('Location update requires coordinates formatted as lat, lng.')
-      setIsSaving(false)
-      return
-    }
-
-    const idempotencyKey = `driver-${driverIdFor(profile)}-${form.shipmentId}-${form.eventType}-${Date.now()}`
+  async function handleAction(eventType) {
+    if (!selectedId || busy) return
+    setBusy(eventType)
+    setResult(null)
 
     try {
-      if (form.eventType === 'location_updated') {
-        await createLocationUpdate(form.shipmentId, {
-          driverId: driverIdFor(profile),
-          idempotencyKey,
-          location,
-          notes: notesWithLocation(form.notes, form.location),
-          occurredAt,
-        }, { token })
-      } else {
-        await createTrackingEvent(form.shipmentId, {
-          driverId: driverIdFor(profile),
-          eventType: form.eventType,
-          idempotencyKey,
-          ...(location ? { location } : {}),
-          notes: notesWithLocation(form.notes, form.location),
-          occurredAt,
-        }, { token })
+      const tracking = trackingByShipmentId?.get(selectedId)
+      const latestEventType = tracking?.latestEvent?.eventType
+      const currentOrder = EVENT_ORDER[latestEventType] || 0
+      const targetOrder = EVENT_ORDER[eventType] || 0
+
+      // Auto-indsæt obligatoriske forudsætningshændelser hvis de mangler
+      if (targetOrder > 0) {
+        const prereqsNeeded = REQUIRED_FLOW.filter(
+          (req) => req.order < targetOrder && req.order > currentOrder
+        )
+        for (const prereq of prereqsNeeded) {
+          await submitEvent(selectedId, prereq.eventType)
+        }
       }
 
-      setMessage('Tracking update submitted.')
-      setForm((current) => ({ ...current, location: '', notes: '' }))
+      await createTrackingEvent(selectedId, {
+        driverId: driverIdFor(profile),
+        eventType,
+        idempotencyKey: `driver-${driverIdFor(profile)}-${selectedId}-${eventType}-${Date.now()}`,
+        notes: note || undefined,
+        occurredAt: new Date().toISOString(),
+      }, { token })
+
+      setResult({ ok: true, message: 'Registreret!' })
+      setNote('')
+      setShowNote(false)
       onSaved?.()
-    } catch (error) {
-      setMessage(error.message)
+    } catch (err) {
+      setResult({ ok: false, message: err.message })
     } finally {
-      setIsSaving(false)
+      setBusy(null)
     }
   }
 
-  return (
-    <form className="stacked-form" onSubmit={handleSubmit}>
-      <label className="field">
-        <span>Shipment</span>
-        <select onChange={(event) => setForm((current) => ({ ...current, shipmentId: event.target.value }))} value={form.shipmentId}>
-          <option value="">Select assigned shipment</option>
-          {shipments.map((shipment) => (
-            <option key={shipment._id} value={shipment._id}>{compactId(shipment._id)} / {formatStatus(shipment.status)}</option>
-          ))}
-        </select>
-      </label>
+  const tracking = trackingByShipmentId?.get(selectedId)
+  const currentOrder = EVENT_ORDER[tracking?.latestEvent?.eventType] || 0
+  const isCompleted = currentOrder >= 120
 
-      <div className="form-grid two">
-        <label className="field">
-          <span>Event type</span>
-          <select onChange={(event) => setForm((current) => ({ ...current, eventType: event.target.value }))} value={form.eventType}>
-            {trackingMilestones.map((milestone) => (
-              <option key={milestone.value} value={milestone.value}>{milestone.label}</option>
+  const validActions = QUICK_ACTIONS.filter((action) => {
+    if (action.sideEvent) return currentOrder > 0
+    if (action.repeatable) return action.order >= currentOrder
+    return action.order > currentOrder
+  })
+
+  return (
+    <div className="driver-quick-actions">
+      {shipments.length > 1 && (
+        <label className="driver-shipment-select">
+          <span>Sending</span>
+          <select value={selectedId} onChange={(e) => { setSelectedId(e.target.value); setResult(null) }}>
+            {shipments.map((s) => (
+              <option key={s._id} value={s._id}>
+                {compactId(s._id)} – {formatStatus(s.status)}
+              </option>
             ))}
           </select>
         </label>
-        <label className="field">
-          <span>Timestamp</span>
-          <input onChange={(event) => setForm((current) => ({ ...current, occurredAt: event.target.value }))} type="datetime-local" value={form.occurredAt} />
-        </label>
+      )}
+
+      {isCompleted ? (
+        <div className="driver-result driver-result-ok">Sending er afsluttet og leveret.</div>
+      ) : (
+        <div className="driver-action-grid">
+          {validActions.map((action) => (
+            <button
+              key={action.eventType}
+              className={`driver-action-btn driver-tone-${action.tone}`}
+              disabled={!!busy || !selectedId}
+              onClick={() => handleAction(action.eventType)}
+              type="button"
+            >
+              <span className="driver-action-label">{action.label}</span>
+              {busy === action.eventType && <span className="driver-action-busy">...</span>}
+            </button>
+          ))}
+        </div>
+      )}
+
+      <div className="driver-note-area">
+        {!showNote && (
+          <button className="driver-note-toggle" onClick={() => setShowNote(true)} type="button">
+            + Tilføj note (valgfrit)
+          </button>
+        )}
+        {showNote && (
+          <>
+            <textarea
+              className="driver-note-input"
+              placeholder="Skriv en kort note..."
+              rows={3}
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+            />
+            <button className="driver-note-toggle" onClick={() => { setShowNote(false); setNote('') }} type="button">
+              − Fjern note
+            </button>
+          </>
+        )}
       </div>
 
-      <label className="field">
-        <span>Location</span>
-        <input onChange={(event) => setForm((current) => ({ ...current, location: event.target.value }))} placeholder="Terminal name or lat, lng for GPS update" value={form.location} />
-      </label>
-      <label className="field">
-        <span>Notes</span>
-        <textarea onChange={(event) => setForm((current) => ({ ...current, notes: event.target.value }))} placeholder="Short operational note" value={form.notes} />
-      </label>
-      {message ? <Notice tone={message.includes('submitted') ? 'subtle' : 'warning'}>{message}</Notice> : null}
-      <button className="button-primary" disabled={isSaving || shipments.length === 0} type="submit">
-        {isSaving ? 'Submitting update' : 'Submit update'}
-      </button>
-    </form>
+      {result && (
+        <div className={`driver-result ${result.ok ? 'driver-result-ok' : 'driver-result-err'}`}>
+          {result.ok ? '✓ ' : '✗ '}{result.message}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function DriverAvailabilityToggle({ profile, token }) {
+  const [available, setAvailable] = useState(null)
+  const [busy, setBusy] = useState(false)
+
+  useEffect(() => {
+    getDriver(driverIdFor(profile), { token })
+      .then((driver) => setAvailable(driver.available))
+      .catch(() => setAvailable(null))
+  }, [profile?.id, token])
+
+  async function handleToggle() {
+    if (busy || available === null) return
+    const next = !available
+    setBusy(true)
+    try {
+      await updateDriverAvailability(driverIdFor(profile), next, { token })
+      setAvailable(next)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  if (available === null) return null
+
+  return (
+    <button
+      className={`driver-availability-toggle ${available ? 'is-available' : 'is-unavailable'}`}
+      disabled={busy}
+      onClick={handleToggle}
+      type="button"
+    >
+      <span className="driver-availability-dot" />
+      <span className="driver-availability-label">
+        {available ? 'Ledig — tryk for at sætte dig utilgængelig' : 'Ikke ledig — tryk for at sætte dig ledig'}
+      </span>
+      <span className="driver-availability-state">{available ? 'Ledig' : 'Utilgængelig'}</span>
+    </button>
   )
 }
 
 export function DriverDashboardPage({ onNavigate, onSignOut, profile, token }) {
   const state = useDriverData({ profile, token })
   const trackingByShipmentId = useMemo(
-    () => new Map(state.trackingSummaries.map((summary) => [summary.shipmentId, summary])),
+    () => new Map(state.trackingSummaries.map((s) => [s.shipmentId, s])),
     [state.trackingSummaries]
   )
-  const completed = state.shipments.filter((shipment) => shipment.status === 'received').length
-  const delayed = state.shipments.filter((shipment) => {
-    const eta = new Date(shipment.estimatedArrivalAt).getTime()
-    return shipment.status === 'in_transit' && Number.isFinite(eta) && eta < Date.now()
-  }).length
+  const completed = state.shipments.filter((s) => s.status === 'received').length
+  const active = state.shipments.length - completed
+
+  const hour = new Date().getHours()
+  const greeting = hour < 12 ? 'God morgen' : hour < 17 ? 'God dag' : 'God aften'
+  const firstName = profile?.name?.split(' ')[0] || 'chauffør'
 
   return (
-    <AppShell active="driver-dashboard" onNavigate={onNavigate} onSignOut={onSignOut} profile={profile}>
-      <section className="workspace-hero">
-        <div>
-          <p className="eyebrow">Driver overview</p>
-          <h1>Assigned shipments today</h1>
-          <p>Submit pickup, terminal, border, delay, location, and delivery events for shipments assigned to you.</p>
-        </div>
-      </section>
+    <AppShell active="driver-dashboard" onNavigate={onNavigate} onSignOut={onSignOut} profile={profile} token={token}>
+      <div className="driver-greeting">
+        <h1>{greeting}, {firstName}</h1>
+        <p className="driver-greeting-sub">
+          {state.loading ? 'Henter sendinger...'
+            : active === 0 && completed === 0 ? 'Ingen sendinger tildelt i dag'
+            : active === 0 ? `Alle ${completed} sendinger er afsluttet`
+            : `${active} aktiv${active !== 1 ? 'e' : ''} sending${active !== 1 ? 'er' : ''}${completed > 0 ? ` · ${completed} afsluttet` : ''}`}
+        </p>
+        <DriverAvailabilityToggle profile={profile} token={token} />
+      </div>
 
-      {state.errors.length > 0 ? (
+      {state.errors.length > 0 && (
         <Notice tone="warning">
-          <strong>Some driver services did not answer.</strong>
-          <ul>{state.errors.map((error) => <li key={error}>{error}</li>)}</ul>
+          <strong>Der opstod en fejl.</strong>
+          <ul>{state.errors.map((e) => <li key={e}>{e}</li>)}</ul>
         </Notice>
-      ) : null}
+      )}
 
-      {state.loading ? <LoadingGrid count={4} /> : (
+      {state.loading ? <LoadingGrid count={2} /> : null}
+
+      {!state.loading && state.shipments.length === 0 && (
+        <EmptyState message="Ingen sendinger er tildelt din chaufførprofil." />
+      )}
+
+      {!state.loading && state.shipments.length > 0 && (
         <>
-          <div className="stat-grid">
-            <StatCard detail="Assigned to your driver profile" icon="truck" label="Assigned" value={state.shipments.length} />
-            <StatCard detail="Shipment status received" icon="check" label="Completed" value={completed} />
-            <StatCard detail="Still waiting for next event" icon="clock" label="Pending updates" value={Math.max(state.shipments.length - completed, 0)} />
-            <StatCard detail="ETA has passed" icon="warning" label="Exceptions" tone="warning" value={delayed} />
-          </div>
-
-          <div className="panel-grid">
-            <section className="form-panel">
-              <div className="panel-heading">
-                <div>
-                  <span>Quick event</span>
-                  <h2>Submit tracking update</h2>
-                </div>
+          <section className="driver-main-panel">
+            <div className="panel-heading">
+              <div>
+                <span>Hurtig registrering</span>
+                <h2>Hvad er sket?</h2>
               </div>
-              <DriverEventForm onSaved={state.loadDriverData} profile={profile} shipments={state.shipments} token={token} />
-            </section>
+            </div>
+            <DriverQuickActions
+              onSaved={state.loadDriverData}
+              profile={profile}
+              shipments={state.shipments}
+              token={token}
+              trackingByShipmentId={trackingByShipmentId}
+            />
+          </section>
 
-            <section className="panel">
-              <div className="panel-heading">
-                <div>
-                  <span>Assigned route</span>
-                  <h2>Next shipments</h2>
-                </div>
+          <section className="driver-main-panel">
+            <div className="panel-heading">
+              <div>
+                <span>Mine sendinger</span>
+                <h2>Tildelte ruter</h2>
               </div>
-              <div className="shipment-grid">
-                {state.shipments.slice(0, 2).map((shipment) => (
-                  <ShipmentCard
+            </div>
+            <div className="driver-card-list">
+              {state.shipments.map((shipment) => {
+                const tracking = trackingByShipmentId.get(shipment._id)
+                return (
+                  <button
                     key={shipment._id}
-                    onOpen={() => onNavigate(`/driver/shipments/${shipment._id}/update`)}
-                    shipment={shipment}
-                    tracking={trackingByShipmentId.get(shipment._id)}
-                  />
-                ))}
-              </div>
-              {state.shipments.length === 0 ? <EmptyState compact message="No shipments are assigned to this driver profile." /> : null}
-            </section>
-          </div>
+                    className="driver-shipment-row"
+                    onClick={() => onNavigate(`/driver/shipments/${shipment._id}/update`)}
+                    type="button"
+                  >
+                    <div className="driver-shipment-row-left">
+                      <strong>{compactId(shipment._id)}</strong>
+                      <span>{tracking?.trackingStatusLabel || formatStatus(shipment.status)}</span>
+                      <small>ETA: {formatDateTime(shipment.estimatedArrivalAt)}</small>
+                    </div>
+                    <span className={`status-badge status-${String(shipment.status || '').replaceAll('_', '-')}`}>
+                      {formatStatus(shipment.status)}
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+          </section>
         </>
       )}
     </AppShell>
@@ -276,20 +373,41 @@ export function DriverAssignedShipmentsPage({ onNavigate, onSignOut, profile, to
   const state = useDriverData({ profile, token })
 
   return (
-    <AppShell active="driver-assigned" onNavigate={onNavigate} onSignOut={onSignOut} profile={profile}>
-      <section className="workspace-hero">
-        <div>
-          <p className="eyebrow">Assigned shipments</p>
-          <h1>Route worklist</h1>
-          <p>Only shipments assigned to your driver profile are shown here.</p>
-        </div>
-      </section>
+    <AppShell active="driver-assigned" onNavigate={onNavigate} onSignOut={onSignOut} profile={profile} token={token}>
+      <div className="driver-greeting">
+        <h1>Mine sendinger</h1>
+        <p className="driver-greeting-sub">
+          {state.loading ? 'Henter...' : `${state.shipments.length} tildelt${state.shipments.length !== 1 ? 'e' : ''}`}
+        </p>
+      </div>
 
       {state.loading ? <LoadingGrid count={4} /> : null}
-      {!state.loading && state.shipments.length > 0 ? (
-        <ShipmentTable onOpen={(shipment) => onNavigate(`/driver/shipments/${shipment._id}/update`)} shipments={state.shipments} />
-      ) : null}
-      {!state.loading && state.shipments.length === 0 ? <EmptyState message="No assigned shipments are available." /> : null}
+      {!state.loading && state.shipments.length === 0 && (
+        <EmptyState message="Ingen sendinger er tildelt din chaufførprofil." />
+      )}
+      {!state.loading && state.shipments.length > 0 && (
+        <section className="driver-main-panel">
+          <div className="driver-card-list">
+            {state.shipments.map((shipment) => (
+              <button
+                key={shipment._id}
+                className="driver-shipment-row"
+                onClick={() => onNavigate(`/driver/shipments/${shipment._id}/update`)}
+                type="button"
+              >
+                <div className="driver-shipment-row-left">
+                  <strong>{compactId(shipment._id)}</strong>
+                  <span>{formatStatus(shipment.status)}</span>
+                  <small>ETA: {formatDateTime(shipment.estimatedArrivalAt)}</small>
+                </div>
+                <svg aria-hidden="true" fill="none" height="20" viewBox="0 0 24 24" width="20">
+                  <path d="M9 18l6-6-6-6" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
+                </svg>
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
     </AppShell>
   )
 }
@@ -298,41 +416,52 @@ export function DriverShipmentUpdatePage({ onNavigate, onSignOut, profile, shipm
   const state = useDriverData({ profile, token })
   const shipment = state.shipments.find((item) => item._id === shipmentId)
   const tracking = state.trackingSummaries.find((item) => item.shipmentId === shipmentId)
+  const trackingByShipmentId = useMemo(
+    () => new Map(state.trackingSummaries.map((s) => [s.shipmentId, s])),
+    [state.trackingSummaries]
+  )
 
   return (
-    <AppShell active="driver-assigned" onNavigate={onNavigate} onSignOut={onSignOut} profile={profile}>
-      <section className="workspace-hero">
-        <div>
-          <p className="eyebrow">Shipment update</p>
-          <h1>{compactId(shipmentId)}</h1>
-          <p>Register the next operational event for this assigned shipment.</p>
-        </div>
-      </section>
+    <AppShell active="driver-assigned" onNavigate={onNavigate} onSignOut={onSignOut} profile={profile} token={token}>
+      <div className="driver-greeting">
+        <button
+          className="driver-back-btn"
+          onClick={() => onNavigate('/driver/assigned-shipments')}
+          type="button"
+        >
+          ← Tilbage til sendinger
+        </button>
+        <h1>{compactId(shipmentId)}</h1>
+        {shipment && (
+          <p className="driver-greeting-sub">
+            {tracking?.trackingStatusLabel || formatStatus(shipment.status)}
+            {shipment.estimatedArrivalAt ? ` · ETA ${formatDateTime(shipment.estimatedArrivalAt)}` : ''}
+          </p>
+        )}
+      </div>
 
       {state.loading ? <LoadingGrid count={2} /> : null}
-      {!state.loading && !shipment ? <EmptyState message="This shipment is not assigned to the current driver profile." /> : null}
-      {!state.loading && shipment ? (
-        <div className="panel-grid">
-          <section className="form-panel">
-            <div className="panel-heading">
-              <div>
-                <span>Event submission</span>
-                <h2>Submit update</h2>
-              </div>
+      {!state.loading && !shipment && (
+        <EmptyState message="Denne sending er ikke tildelt din chaufførprofil." />
+      )}
+      {!state.loading && shipment && (
+        <section className="driver-main-panel">
+          <div className="panel-heading">
+            <div>
+              <span>Registrer hændelse</span>
+              <h2>Hvad er sket?</h2>
             </div>
-            <DriverEventForm initialShipmentId={shipmentId} onSaved={state.loadDriverData} profile={profile} shipments={state.shipments} token={token} />
-          </section>
-          <section className="panel">
-            <div className="panel-heading">
-              <div>
-                <span>Latest event</span>
-                <h2>Shipment context</h2>
-              </div>
-            </div>
-            <ShipmentCard shipment={shipment} tracking={tracking} />
-          </section>
-        </div>
-      ) : null}
+          </div>
+          <DriverQuickActions
+            initialShipmentId={shipmentId}
+            onSaved={state.loadDriverData}
+            profile={profile}
+            shipments={state.shipments}
+            token={token}
+            trackingByShipmentId={trackingByShipmentId}
+          />
+        </section>
+      )}
     </AppShell>
   )
 }
@@ -341,7 +470,7 @@ export function DriverEventsPage({ onNavigate, onSignOut, profile, token }) {
   const state = useDriverData({ profile, token })
 
   return (
-    <AppShell active="driver-events" onNavigate={onNavigate} onSignOut={onSignOut} profile={profile}>
+    <AppShell active="driver-events" onNavigate={onNavigate} onSignOut={onSignOut} profile={profile} token={token}>
       <section className="workspace-hero">
         <div>
           <p className="eyebrow">Route events</p>
@@ -401,7 +530,7 @@ export function DriverLoyaltyPage({ onNavigate, onSignOut, profile, token }) {
     : 'Max tier'
 
   return (
-    <AppShell active="driver-loyalty" onNavigate={onNavigate} onSignOut={onSignOut} profile={profile}>
+    <AppShell active="driver-loyalty" onNavigate={onNavigate} onSignOut={onSignOut} profile={profile} token={token}>
       <section className="workspace-hero">
         <div>
           <p className="eyebrow">Driver rewards</p>

@@ -85,7 +85,7 @@ export function ChatPage({ onNavigate, onSignOut, profile, token }) {
   }
 
   return (
-    <AppShell active={activeFor(profile)} onNavigate={onNavigate} onSignOut={onSignOut} profile={profile}>
+    <AppShell active={activeFor(profile)} onNavigate={onNavigate} onSignOut={onSignOut} profile={profile} token={token}>
       <section className="workspace-hero">
         <div>
           <p className="eyebrow">AI assistant</p>

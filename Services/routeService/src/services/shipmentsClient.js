@@ -30,7 +30,9 @@ async function verifyShipmentExists(shipmentId) {
   const encodedShipmentId = encodeURIComponent(shipmentId)
   let response
   try {
-    response = await fetchWithTimeout(`${shipmentsServiceUrl}/shipments/${encodedShipmentId}`)
+    response = await fetchWithTimeout(`${shipmentsServiceUrl}/shipments/${encodedShipmentId}`, {
+      headers: serviceHeaders(),
+    })
   } catch (err) {
     const unavailable = new Error(`shipmentsService unavailable: ${err.message}`)
     unavailable.status = 503
