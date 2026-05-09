@@ -269,6 +269,7 @@ export function SignedInHeader({ active, onNavigate, onSignOut, profile, token }
   const [isOpen, setIsOpen] = useState(false)
   const role = normalizeRole(profile?.role)
   const items = roleNav[role]
+  const hasNotificationInbox = canUseNotificationInbox(profile)
 
   function handleNav(path) {
     setIsOpen(false)

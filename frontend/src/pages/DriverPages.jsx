@@ -291,16 +291,13 @@ export function DriverDashboardPage({ onNavigate, onSignOut, profile, token }) {
 
   return (
     <AppShell active="driver-dashboard" onNavigate={onNavigate} onSignOut={onSignOut} profile={profile} token={token}>
-      <div className="driver-greeting">
-        <h1>{greeting}, {firstName}</h1>
-        <p className="driver-greeting-sub">
-          {state.loading ? 'Henter sendinger...'
-            : active === 0 && completed === 0 ? 'Ingen sendinger tildelt i dag'
-            : active === 0 ? `Alle ${completed} sendinger er afsluttet`
-            : `${active} aktiv${active !== 1 ? 'e' : ''} sending${active !== 1 ? 'er' : ''}${completed > 0 ? ` · ${completed} afsluttet` : ''}`}
-        </p>
-        <DriverAvailabilityToggle profile={profile} token={token} />
-      </div>
+      <section className="workspace-hero">
+        <div>
+          <p className="eyebrow">Driver overview</p>
+          <h1>Assigned shipments today</h1>
+          <p>Submit pickup, terminal, border, delay, location, and delivery events for shipments assigned to you.</p>
+        </div>
+      </section>
 
       {state.errors.length > 0 && (
         <Notice tone="warning">
@@ -374,12 +371,13 @@ export function DriverAssignedShipmentsPage({ onNavigate, onSignOut, profile, to
 
   return (
     <AppShell active="driver-assigned" onNavigate={onNavigate} onSignOut={onSignOut} profile={profile} token={token}>
-      <div className="driver-greeting">
-        <h1>Mine sendinger</h1>
-        <p className="driver-greeting-sub">
-          {state.loading ? 'Henter...' : `${state.shipments.length} tildelt${state.shipments.length !== 1 ? 'e' : ''}`}
-        </p>
-      </div>
+      <section className="workspace-hero">
+        <div>
+          <p className="eyebrow">Assigned shipments</p>
+          <h1>Route worklist</h1>
+          <p>Only shipments assigned to your driver profile are shown here.</p>
+        </div>
+      </section>
 
       {state.loading ? <LoadingGrid count={4} /> : null}
       {!state.loading && state.shipments.length === 0 && (
@@ -423,22 +421,13 @@ export function DriverShipmentUpdatePage({ onNavigate, onSignOut, profile, shipm
 
   return (
     <AppShell active="driver-assigned" onNavigate={onNavigate} onSignOut={onSignOut} profile={profile} token={token}>
-      <div className="driver-greeting">
-        <button
-          className="driver-back-btn"
-          onClick={() => onNavigate('/driver/assigned-shipments')}
-          type="button"
-        >
-          ← Tilbage til sendinger
-        </button>
-        <h1>{compactId(shipmentId)}</h1>
-        {shipment && (
-          <p className="driver-greeting-sub">
-            {tracking?.trackingStatusLabel || formatStatus(shipment.status)}
-            {shipment.estimatedArrivalAt ? ` · ETA ${formatDateTime(shipment.estimatedArrivalAt)}` : ''}
-          </p>
-        )}
-      </div>
+      <section className="workspace-hero">
+        <div>
+          <p className="eyebrow">Shipment update</p>
+          <h1>{compactId(shipmentId)}</h1>
+          <p>Register the next operational event for this assigned shipment.</p>
+        </div>
+      </section>
 
       {state.loading ? <LoadingGrid count={2} /> : null}
       {!state.loading && !shipment && (
