@@ -363,7 +363,7 @@ export function AdminLandingPage({ onNavigate, onSignOut, profile, token }) {
   }
 
   return (
-    <AppShell active="operator-console" onNavigate={onNavigate} onSignOut={onSignOut} profile={profile}>
+    <AppShell active="operator-console" onNavigate={onNavigate} onSignOut={onSignOut} profile={profile} token={token}>
       {/* Hero */}
       <section className="workspace-hero">
         <div>

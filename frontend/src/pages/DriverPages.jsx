@@ -210,7 +210,7 @@ export function DriverDashboardPage({ onNavigate, onSignOut, profile, token }) {
   }).length
 
   return (
-    <AppShell active="driver-dashboard" onNavigate={onNavigate} onSignOut={onSignOut} profile={profile}>
+    <AppShell active="driver-dashboard" onNavigate={onNavigate} onSignOut={onSignOut} profile={profile} token={token}>
       <section className="workspace-hero">
         <div>
           <p className="eyebrow">Driver overview</p>
@@ -276,7 +276,7 @@ export function DriverAssignedShipmentsPage({ onNavigate, onSignOut, profile, to
   const state = useDriverData({ profile, token })
 
   return (
-    <AppShell active="driver-assigned" onNavigate={onNavigate} onSignOut={onSignOut} profile={profile}>
+    <AppShell active="driver-assigned" onNavigate={onNavigate} onSignOut={onSignOut} profile={profile} token={token}>
       <section className="workspace-hero">
         <div>
           <p className="eyebrow">Assigned shipments</p>
@@ -300,7 +300,7 @@ export function DriverShipmentUpdatePage({ onNavigate, onSignOut, profile, shipm
   const tracking = state.trackingSummaries.find((item) => item.shipmentId === shipmentId)
 
   return (
-    <AppShell active="driver-assigned" onNavigate={onNavigate} onSignOut={onSignOut} profile={profile}>
+    <AppShell active="driver-assigned" onNavigate={onNavigate} onSignOut={onSignOut} profile={profile} token={token}>
       <section className="workspace-hero">
         <div>
           <p className="eyebrow">Shipment update</p>
@@ -341,7 +341,7 @@ export function DriverEventsPage({ onNavigate, onSignOut, profile, token }) {
   const state = useDriverData({ profile, token })
 
   return (
-    <AppShell active="driver-events" onNavigate={onNavigate} onSignOut={onSignOut} profile={profile}>
+    <AppShell active="driver-events" onNavigate={onNavigate} onSignOut={onSignOut} profile={profile} token={token}>
       <section className="workspace-hero">
         <div>
           <p className="eyebrow">Route events</p>
@@ -401,7 +401,7 @@ export function DriverLoyaltyPage({ onNavigate, onSignOut, profile, token }) {
     : 'Max tier'
 
   return (
-    <AppShell active="driver-loyalty" onNavigate={onNavigate} onSignOut={onSignOut} profile={profile}>
+    <AppShell active="driver-loyalty" onNavigate={onNavigate} onSignOut={onSignOut} profile={profile} token={token}>
       <section className="workspace-hero">
         <div>
           <p className="eyebrow">Driver rewards</p>

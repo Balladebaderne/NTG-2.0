@@ -1,7 +1,15 @@
 import React, { useState } from 'react'
+import { NotificationInbox } from './NotificationInbox'
 import { asArray, compactId, formatDateTime, formatStatus } from '../utils/format'
+import { canUseNotificationInbox } from '../utils/notificationPolicy'
 
 const iconPaths = {
+  bell: (
+    <>
+      <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" />
+      <path d="M10 21h4" />
+    </>
+  ),
   box: (
     <>
       <path d="M4 7.5 12 3l8 4.5-8 4.5L4 7.5Z" />
@@ -202,9 +210,10 @@ export function PublicHeader({ active = 'home', onNavigate }) {
   )
 }
 
-export function SignedInHeader({ active, onNavigate, onSignOut, profile }) {
+export function SignedInHeader({ active, onNavigate, onSignOut, profile, token }) {
   const role = normalizeRole(profile?.role)
   const items = roleNav[role]
+  const hasNotificationInbox = canUseNotificationInbox(profile)
 
   return (
     <header className="site-header signed-in-header">
@@ -222,7 +231,8 @@ export function SignedInHeader({ active, onNavigate, onSignOut, profile }) {
           </button>
         ))}
       </nav>
-      <div className="profile-actions">
+      <div className={`profile-actions ${hasNotificationInbox ? 'has-notification-inbox' : ''}`}>
+        <NotificationInbox icon={<Icon name="bell" />} profile={profile} token={token} />
         <div className="profile-chip">
           <span>{profile?.roleLabel || formatStatus(role)}</span>
           <strong>{profile?.name || 'NTG user'}</strong>
@@ -260,10 +270,10 @@ export function RoleNavigation({ active, onNavigate, profile }) {
   )
 }
 
-export function AppShell({ active, children, onNavigate, onSignOut, profile }) {
+export function AppShell({ active, children, onNavigate, onSignOut, profile, token }) {
   return (
     <main className="portal-shell">
-      <SignedInHeader active={active} onNavigate={onNavigate} onSignOut={onSignOut} profile={profile} />
+      <SignedInHeader active={active} onNavigate={onNavigate} onSignOut={onSignOut} profile={profile} token={token} />
       <div className="workspace-main-only">
         <section className="workspace-main">{children}</section>
       </div>

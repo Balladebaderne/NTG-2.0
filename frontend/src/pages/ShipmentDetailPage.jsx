@@ -100,7 +100,7 @@ export function ShipmentDetailPage({
   const history = asArray(state.tracking?.history)
 
   return (
-    <AppShell active={active} onNavigate={onNavigate} onSignOut={onSignOut} profile={profile}>
+    <AppShell active={active} onNavigate={onNavigate} onSignOut={onSignOut} profile={profile} token={token}>
       <section className="workspace-hero">
         <div>
           <p className="eyebrow">Shipment detail</p>

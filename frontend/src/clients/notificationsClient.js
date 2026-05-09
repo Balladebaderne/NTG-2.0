@@ -1,7 +1,15 @@
 import { apiRequest } from './httpClient'
+import { notificationInboxFilters } from '../utils/notificationPolicy'
 
-export function listNotifications({ token, filters } = {}) {
-  return apiRequest('/notifications', { params: filters, token })
+export function listNotifications({ filters, profile, token, unreadOnly } = {}) {
+  return apiRequest('/notifications', {
+    params: {
+      ...notificationInboxFilters(profile),
+      ...filters,
+      ...(unreadOnly === undefined ? {} : { unreadOnly }),
+    },
+    token,
+  })
 }
 
 export function markNotificationRead(notificationId, { token } = {}) {

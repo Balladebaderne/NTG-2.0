@@ -344,7 +344,7 @@ export function OperatorDashboardPage({ onNavigate, onSignOut, profile, token })
   }))).slice(0, 6)
 
   return (
-    <AppShell active="operator-dashboard" onNavigate={onNavigate} onSignOut={onSignOut} profile={profile}>
+    <AppShell active="operator-dashboard" onNavigate={onNavigate} onSignOut={onSignOut} profile={profile} token={token}>
       <OperatorHero onRefresh={state.loadOperatorData} state={state} title="Control tower">
         Operational overview for shipments, events, driver capacity, exceptions, customer records, and support escalation.
       </OperatorHero>
@@ -428,7 +428,7 @@ export function OperatorShipmentsPage({ onNavigate, onSignOut, profile, token })
   }, [filters, state.shipments])
 
   return (
-    <AppShell active="operator-shipments" onNavigate={onNavigate} onSignOut={onSignOut} profile={profile}>
+    <AppShell active="operator-shipments" onNavigate={onNavigate} onSignOut={onSignOut} profile={profile} token={token}>
       <OperatorHero onRefresh={state.loadOperatorData} state={state} title="Shipment management">
         Manage shipment status, route linkage, driver assignment, ETA, customer context, and operational actions.
       </OperatorHero>
@@ -469,7 +469,7 @@ export function OperatorCreateShipmentPage({ onNavigate, onSignOut, profile, tok
   const state = useOperatorData({ token })
 
   return (
-    <AppShell active="operator-create" onNavigate={onNavigate} onSignOut={onSignOut} profile={profile}>
+    <AppShell active="operator-create" onNavigate={onNavigate} onSignOut={onSignOut} profile={profile} token={token}>
       <OperatorHero onRefresh={state.loadOperatorData} state={state} title="Create shipment">
         Register a shipment order with customer, sender, cargo, ETA, and optional driver assignment.
       </OperatorHero>
@@ -506,7 +506,7 @@ export function OperatorDriversPage({ onNavigate, onSignOut, profile, token }) {
   }
 
   return (
-    <AppShell active="operator-drivers" onNavigate={onNavigate} onSignOut={onSignOut} profile={profile}>
+    <AppShell active="operator-drivers" onNavigate={onNavigate} onSignOut={onSignOut} profile={profile} token={token}>
       <OperatorHero onRefresh={state.loadOperatorData} state={state} title="Driver capacity">
         Monitor available drivers and capacity signals used when assigning shipments.
       </OperatorHero>
@@ -542,7 +542,7 @@ export function OperatorCustomersPage({ onNavigate, onSignOut, profile, token })
   const state = useOperatorData({ token })
 
   return (
-    <AppShell active="operator-customers" onNavigate={onNavigate} onSignOut={onSignOut} profile={profile}>
+    <AppShell active="operator-customers" onNavigate={onNavigate} onSignOut={onSignOut} profile={profile} token={token}>
       <OperatorHero onRefresh={state.loadOperatorData} state={state} title="Customers and senders">
         Reference view for customer and sender master data connected to shipment records.
       </OperatorHero>
@@ -612,7 +612,7 @@ export function OperatorEventsPage({ onNavigate, onSignOut, profile, token }) {
   }
 
   return (
-    <AppShell active="operator-events" onNavigate={onNavigate} onSignOut={onSignOut} profile={profile}>
+    <AppShell active="operator-events" onNavigate={onNavigate} onSignOut={onSignOut} profile={profile} token={token}>
       <OperatorHero onRefresh={state.loadOperatorData} state={state} title="Event monitoring">
         View tracking history, delay signals, notification scans, and route event health across active shipments.
       </OperatorHero>
