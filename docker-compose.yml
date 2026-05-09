@@ -197,7 +197,7 @@ services:
       - SHIPMENT_ROUTE_SYNC_ENABLED=true
       - HTTP_TIMEOUT_SECONDS=3
       - GOOGLE_MAPS_API_KEY=${GOOGLE_MAPS_API_KEY:-AIzaSyCfVQgCV8rQjV4EjnkevYoae4hFjyZ4SL0}
-      - ROUTE_CALCULATION_PROVIDER=google
+      - ROUTE_CALCULATION_PROVIDER=template
       - ROUTE_CALCULATION_REQUIRED=false
       - AUTH_REQUIRED=true
       - JWT_SECRET=local-login-secret-change-me
@@ -233,6 +233,7 @@ services:
       - internal
     volumes:
       - route_db_data:/var/lib/postgresql/data
+      - ./Services/routeService/Database/init:/docker-entrypoint-initdb.d
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d route_db"]
       interval: 5s

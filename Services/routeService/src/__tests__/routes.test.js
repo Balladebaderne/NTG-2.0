@@ -9,18 +9,18 @@ jest.mock('../models/RoutePlan', () => ({
   update: jest.fn(),
 }))
 
-jest.mock('../services/shipmentsClient', () => ({
+jest.mock('../modules/shipmentsClient', () => ({
   syncShipmentRoute: jest.fn(),
   verifyShipmentExists: jest.fn(),
 }))
 
-jest.mock('../services/routeCalculation', () => ({
+jest.mock('../modules/routeCalculation', () => ({
   enrichRouteInput: jest.fn(),
 }))
 
 const RoutePlan = require('../models/RoutePlan')
-const { enrichRouteInput } = require('../services/routeCalculation')
-const { syncShipmentRoute, verifyShipmentExists } = require('../services/shipmentsClient')
+const { enrichRouteInput } = require('../modules/routeCalculation')
+const { syncShipmentRoute, verifyShipmentExists } = require('../modules/shipmentsClient')
 const app = require('../app')
 
 const route = {

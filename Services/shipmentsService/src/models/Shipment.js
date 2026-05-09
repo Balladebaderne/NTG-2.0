@@ -15,6 +15,13 @@ const GoodsSchema = new mongoose.Schema({
   items:         { type: [ItemSchema], default: [] },
 }, { _id: false })
 
+const AddressSchema = new mongoose.Schema({
+  street:     { type: String, default: null },
+  city:       { type: String, required: true },
+  postalCode: { type: String, default: null },
+  country:    { type: String, required: true },
+}, { _id: false })
+
 const ShipmentSchema = new mongoose.Schema({
   status:                    { type: String, enum: ['booked', 'in_transit', 'received'], default: 'booked' },
   senderId:                  { type: String, required: true },
@@ -23,6 +30,8 @@ const ShipmentSchema = new mongoose.Schema({
   driverId:                  { type: String, default: null },
   routeId:                   { type: String, default: null },
   estimatedArrivalAt:        { type: Date, default: null },
+  originAddress:             { type: AddressSchema, default: null },
+  destinationAddress:        { type: AddressSchema, default: null },
   goods:                     { type: [GoodsSchema], default: [] },
 }, { timestamps: true })
 

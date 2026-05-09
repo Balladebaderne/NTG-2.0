@@ -2,8 +2,8 @@ const express = require('express')
 
 const { requireWriteAuth } = require('../middleware/requireWriteAuth')
 const RoutePlan = require('../models/RoutePlan')
-const { enrichRouteInput } = require('../services/routeCalculation')
-const { syncShipmentRoute, verifyShipmentExists } = require('../services/shipmentsClient')
+const { enrichRouteInput } = require('../modules/routeCalculation')
+const { syncShipmentRoute, verifyShipmentExists } = require('../modules/shipmentsClient')
 
 const router = express.Router()
 

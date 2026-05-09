@@ -7,6 +7,7 @@
     "test": "jest --runInBand --forceExit"
   },
   "dependencies": {
+    "amqplib": "^0.10.9",
     "express": "^4.18.2",
     "jsonwebtoken": "^9.0.2",
     "pg": "^8.10.0",

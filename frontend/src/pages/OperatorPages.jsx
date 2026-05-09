@@ -2,9 +2,9 @@ import React, { useEffect, useMemo, useState } from 'react'
 import { listCustomers } from '../clients/customersClient'
 import { listDrivers, updateDriverAvailability } from '../clients/driversClient'
 import { listNotifications, scanDelayNotifications } from '../clients/notificationsClient'
-import { listRoutes } from '../clients/routesClient'
+import { createRoute, listRoutes } from '../clients/routesClient'
 import { listSenders } from '../clients/sendersClient'
-import { createShipment, listShipments, updateShipment } from '../clients/shipmentsClient'
+import { createShipment, deleteShipment, listShipments, updateShipment } from '../clients/shipmentsClient'
 import { getDelayedShipments, getDiscrepancies, getMissingEvents, listTickets } from '../clients/supportClient'
 import { getLatestTracking } from '../clients/trackingClient'
 import {
@@ -35,12 +35,20 @@ function initialCreateForm(profile) {
   return {
     description: 'General cargo',
     driverId: '',
-    estimatedArrivalAt: '',
+    plannedPickupAt: '',
     receiverCustomerId: 'customer-1',
     senderId: 'sender-1',
     totalVolumeM3: '2.5',
     totalWeightKG: '100',
     createdByCustomerServiceId: profile?.id || 'operator-console',
+    originStreet: '',
+    originCity: '',
+    originPostalCode: '',
+    originCountry: '',
+    destinationStreet: '',
+    destinationCity: '',
+    destinationPostalCode: '',
+    destinationCountry: '',
   }
 }
 
@@ -237,6 +245,16 @@ function CreateShipmentForm({ onCreated, profile, state, token }) {
       return
     }
 
+    if (!form.originCity || !form.originCountry) {
+      setMessage('Origin city and country are required.')
+      return
+    }
+
+    if (!form.destinationCity || !form.destinationCountry) {
+      setMessage('Destination city and country are required.')
+      return
+    }
+
     setBusy(true)
     const totalWeightKG = Number(form.totalWeightKG)
     const totalVolumeM3 = Number(form.totalVolumeM3)
@@ -250,20 +268,50 @@ function CreateShipmentForm({ onCreated, profile, state, token }) {
       }]
       : []
 
+    const originAddress = {
+      street: form.originStreet || null,
+      city: form.originCity,
+      postalCode: form.originPostalCode || null,
+      country: form.originCountry,
+    }
+    const destinationAddress = {
+      street: form.destinationStreet || null,
+      city: form.destinationCity,
+      postalCode: form.destinationPostalCode || null,
+      country: form.destinationCountry,
+    }
+
+    let shipment
     try {
-      const shipment = await createShipment({
+      shipment = await createShipment({
         createdByCustomerServiceId: form.createdByCustomerServiceId,
         driverId: form.driverId || null,
-        estimatedArrivalAt: form.estimatedArrivalAt ? new Date(form.estimatedArrivalAt).toISOString() : null,
         goods,
+        originAddress,
+        destinationAddress,
         receiverCustomerId: form.receiverCustomerId,
         senderId: form.senderId,
         status: 'booked',
       }, { token })
-      setMessage(`Shipment ${compactId(shipment._id)} created.`)
-      onCreated?.()
     } catch (error) {
       setMessage(error.message)
+      setBusy(false)
+      return
+    }
+
+    try {
+      await createRoute({
+        shipmentId: shipment._id,
+        origin: { address: originAddress },
+        destination: { address: destinationAddress },
+        plannedPickupAt: form.plannedPickupAt ? new Date(form.plannedPickupAt).toISOString() : null,
+      }, { token })
+      setMessage(`Shipment ${compactId(shipment._id)} created with route.`)
+      onCreated?.()
+    } catch (error) {
+      // Route creation failed — roll back shipment to preserve atomicity
+      try { await deleteShipment(shipment._id, { token }) } catch (_) { /* best effort */ }
+      setMessage(`Route creation failed: ${error.message}. Shipment was not saved.`)
     } finally {
       setBusy(false)
     }
@@ -296,6 +344,54 @@ function CreateShipmentForm({ onCreated, profile, state, token }) {
         </label>
       </div>
 
+      <fieldset>
+        <legend>Origin (pickup)</legend>
+        <div className="form-grid two">
+          <label className="field">
+            <span>Street</span>
+            <input onChange={(event) => updateField('originStreet', event.target.value)} placeholder="Optional" value={form.originStreet} />
+          </label>
+          <label className="field">
+            <span>Postal code</span>
+            <input onChange={(event) => updateField('originPostalCode', event.target.value)} placeholder="Optional" value={form.originPostalCode} />
+          </label>
+        </div>
+        <div className="form-grid two">
+          <label className="field">
+            <span>City *</span>
+            <input onChange={(event) => updateField('originCity', event.target.value)} required value={form.originCity} />
+          </label>
+          <label className="field">
+            <span>Country *</span>
+            <input onChange={(event) => updateField('originCountry', event.target.value)} required value={form.originCountry} />
+          </label>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Destination (delivery)</legend>
+        <div className="form-grid two">
+          <label className="field">
+            <span>Street</span>
+            <input onChange={(event) => updateField('destinationStreet', event.target.value)} placeholder="Optional" value={form.destinationStreet} />
+          </label>
+          <label className="field">
+            <span>Postal code</span>
+            <input onChange={(event) => updateField('destinationPostalCode', event.target.value)} placeholder="Optional" value={form.destinationPostalCode} />
+          </label>
+        </div>
+        <div className="form-grid two">
+          <label className="field">
+            <span>City *</span>
+            <input onChange={(event) => updateField('destinationCity', event.target.value)} required value={form.destinationCity} />
+          </label>
+          <label className="field">
+            <span>Country *</span>
+            <input onChange={(event) => updateField('destinationCountry', event.target.value)} required value={form.destinationCountry} />
+          </label>
+        </div>
+      </fieldset>
+
       <div className="form-grid two">
         <label className="field">
           <span>Driver assignment</span>
@@ -307,8 +403,8 @@ function CreateShipmentForm({ onCreated, profile, state, token }) {
           </select>
         </label>
         <label className="field">
-          <span>Delivery estimate</span>
-          <input onChange={(event) => updateField('estimatedArrivalAt', event.target.value)} type="datetime-local" value={form.estimatedArrivalAt} />
+          <span>Planned pickup</span>
+          <input onChange={(event) => updateField('plannedPickupAt', event.target.value)} type="datetime-local" value={form.plannedPickupAt} />
         </label>
       </div>
 

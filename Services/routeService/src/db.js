@@ -82,6 +82,11 @@ async function ensureSchema() {
     CREATE INDEX IF NOT EXISTS route_stops_route_sequence_idx
       ON route_stops (route_id, sequence)
   `)
+
+  await pool.query(`
+    ALTER TABLE route_stops
+      ADD COLUMN IF NOT EXISTS actual_arrival_at TIMESTAMPTZ
+  `)
 }
 
 module.exports = {
