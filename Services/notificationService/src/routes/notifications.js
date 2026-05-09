@@ -4,6 +4,7 @@ const {
   markNotificationRead,
 } = require('../services/notificationsRepository')
 const { scanForDelayedShipments } = require('../services/delayNotificationService')
+const { requireWriteAuth } = require('../middleware/requireWriteAuth')
 
 const router = express.Router()
 
@@ -22,7 +23,7 @@ router.get('/', async (req, res) => {
 })
 
 // POST /notifications/scan-delays
-router.post('/scan-delays', async (req, res) => {
+router.post('/scan-delays', requireWriteAuth, async (req, res) => {
   try {
     const result = await scanForDelayedShipments()
     res.json(result)
@@ -32,7 +33,7 @@ router.post('/scan-delays', async (req, res) => {
 })
 
 // PATCH /notifications/:id/read
-router.patch('/:id/read', async (req, res) => {
+router.patch('/:id/read', requireWriteAuth, async (req, res) => {
   try {
     const notification = await markNotificationRead(req.params.id)
     if (!notification) return res.status(404).json({ error: 'Notification not found' })
