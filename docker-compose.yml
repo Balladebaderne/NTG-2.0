@@ -190,7 +190,7 @@ services:
       - SHIPMENT_ROUTE_SYNC_ENABLED=true
       - HTTP_TIMEOUT_SECONDS=3
       - GOOGLE_MAPS_API_KEY=${GOOGLE_MAPS_API_KEY:-AIzaSyCfVQgCV8rQjV4EjnkevYoae4hFjyZ4SL0}
-      - ROUTE_CALCULATION_PROVIDER=google
+      - ROUTE_CALCULATION_PROVIDER=template
       - ROUTE_CALCULATION_REQUIRED=false
     depends_on:
       route_db:

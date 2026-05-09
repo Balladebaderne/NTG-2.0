@@ -218,6 +218,65 @@ The encoded polyline can be decoded by a frontend map library to draw the route.
 
 By default, route calculation is non-blocking. If Google is unavailable or the API key is not enabled for Routes API, the route is still created and `metadata.routeCalculation.status` is recorded as `failed`. Set `ROUTE_CALCULATION_REQUIRED=true` when route creation should fail instead.
 
+## External Routing Provider
+
+When `ROUTE_CALCULATION_PROVIDER=external` and `EXTERNAL_ROUTE_PROVIDER_URL` is set, routeService calls the client's routing tool instead of Google. This is a full replacement — the external tool is expected to return both geometry and intermediate stops.
+
+routeService POSTs the following to `EXTERNAL_ROUTE_PROVIDER_URL`:
+
+```json
+{
+  "origin": { "label": "...", "address": { "street": "...", "city": "...", "postalCode": "...", "country": "..." }, "location": { "lat": 0.0, "lng": 0.0 } },
+  "destination": { "label": "...", "address": { ... }, "location": { ... } },
+  "plannedPickupAt": "2026-05-08T09:00:00.000Z",
+  "waypoints": []
+}
+```
+
+The expected response shape:
+
+```json
+{
+  "distanceKm": 1234.5,
+  "durationSeconds": 86400,
+  "encodedPolyline": "...",
+  "polylineEncoding": "ENCODED_POLYLINE",
+  "viewport": null,
+  "warnings": [],
+  "legs": [],
+  "stops": [
+    {
+      "type": "origin_terminal",
+      "address": { "street": null, "city": "Hamburg", "postalCode": null, "country": "DE" },
+      "location": { "lat": 53.5511, "lng": 9.9937 },
+      "plannedArrivalAt": null,
+      "plannedDepartureAt": null,
+      "notes": null,
+      "metadata": null
+    }
+  ]
+}
+```
+
+Geometry fields (`distanceKm`, `durationSeconds`, `encodedPolyline`, etc.) are optional — if absent, distance, duration, and polyline remain unpopulated. The `stops` array contains only intermediate stops; pickup and delivery are always owned by routeService.
+
+Stop types must be one of the values listed in [Stop Types](#stop-types). The client may return any number of stops.
+
+## Template Provider (Demo Mode)
+
+When `ROUTE_CALCULATION_PROVIDER=template`, routeService inserts a fixed set of intermediate stops without calling any external service. This is intended for demos when the client's routing tool is not yet available.
+
+The template always generates four intermediate stops in sequence:
+
+```txt
+origin_terminal  → Hamburg, DE
+border_crossing  → Flensburg, DE (DE/DK border)
+hub              → Kolding, DK
+destination_terminal → Copenhagen, DK
+```
+
+No geometry (distance, duration, polyline) is calculated in template mode.
+
 ## Environment
 
 ```txt
@@ -231,4 +290,5 @@ GOOGLE_MAPS_API_KEY=your-google-maps-api-key
 ROUTE_CALCULATION_PROVIDER=google
 ROUTE_CALCULATION_REQUIRED=false
 GOOGLE_ROUTES_API_URL=https://routes.googleapis.com/directions/v2:computeRoutes
+EXTERNAL_ROUTE_PROVIDER_URL=http://client-routing-tool/calculate
 ```

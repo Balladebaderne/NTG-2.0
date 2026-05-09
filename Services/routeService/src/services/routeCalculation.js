@@ -1,9 +1,19 @@
 const config = require('../config')
 const { computeRoute } = require('./googleRoutesClient')
+const { computeExternalRoute } = require('./externalRoutingClient')
+const { getTemplateIntermediateStops } = require('./templateRoutingClient')
 const { geocodeAddress } = require('./nominatimClient')
 
 function isGoogleCalculationEnabled() {
   return config.routeCalculationProvider === 'google' && Boolean(config.googleMapsApiKey)
+}
+
+function isExternalProviderEnabled() {
+  return config.routeCalculationProvider === 'external' && Boolean(config.externalRouteProviderUrl)
+}
+
+function isTemplateProviderEnabled() {
+  return config.routeCalculationProvider === 'template'
 }
 
 function addSeconds(timestamp, seconds) {
@@ -48,15 +58,32 @@ function applyRouteCalculation(routeInput, calculation) {
   }
 }
 
-function applyRouteCalculationFailure(routeInput, err) {
+function applyRouteCalculationFailure(routeInput, err, provider = 'google_routes') {
   return {
     ...routeInput,
     metadata: mergeRouteCalculationMetadata(routeInput.metadata, {
-      provider: 'google_routes',
+      provider,
       status: 'failed',
       calculatedAt: new Date().toISOString(),
       error: err.message,
     }),
+  }
+}
+
+// Insert intermediate stops between the pickup and delivery stops, re-sequencing all stops.
+function applyIntermediateStops(routeInput, intermediateStops) {
+  if (!Array.isArray(intermediateStops) || intermediateStops.length === 0) return routeInput
+
+  const sorted = [...routeInput.stops].sort((a, b) => a.sequence - b.sequence)
+  const pickup = sorted.find((s) => s.type === 'pickup')
+  const delivery = sorted.find((s) => s.type === 'delivery')
+  const existingIntermediates = sorted.filter((s) => s.type !== 'pickup' && s.type !== 'delivery')
+
+  const combined = [pickup, ...existingIntermediates, ...intermediateStops, delivery].filter(Boolean)
+
+  return {
+    ...routeInput,
+    stops: combined.map((stop, i) => ({ ...stop, sequence: i + 1 })),
   }
 }
 
@@ -90,20 +117,41 @@ async function enrichRouteInput(routeInput) {
     // non-fatal — proceed with whatever locations we have
   }
 
-  if (!isGoogleCalculationEnabled()) return input
-
-  try {
-    return applyRouteCalculation(input, await computeRoute(input))
-  } catch (err) {
-    if (config.routeCalculationRequired) throw err
-    return applyRouteCalculationFailure(input, err)
+  if (isExternalProviderEnabled()) {
+    try {
+      const { geometry, stops } = await computeExternalRoute(input)
+      if (geometry) input = applyRouteCalculation(input, geometry)
+      input = applyIntermediateStops(input, stops)
+    } catch (err) {
+      if (config.routeCalculationRequired) throw err
+      input = applyRouteCalculationFailure(input, err, 'external_routing')
+    }
+    return input
   }
+
+  if (isTemplateProviderEnabled()) {
+    return applyIntermediateStops(input, getTemplateIntermediateStops())
+  }
+
+  if (isGoogleCalculationEnabled()) {
+    try {
+      return applyRouteCalculation(input, await computeRoute(input))
+    } catch (err) {
+      if (config.routeCalculationRequired) throw err
+      return applyRouteCalculationFailure(input, err)
+    }
+  }
+
+  return input
 }
 
 module.exports = {
+  applyIntermediateStops,
   applyRouteCalculation,
   applyRouteCalculationFailure,
   enrichRouteInput,
   geocodeRouteLocations,
+  isExternalProviderEnabled,
   isGoogleCalculationEnabled,
+  isTemplateProviderEnabled,
 }
