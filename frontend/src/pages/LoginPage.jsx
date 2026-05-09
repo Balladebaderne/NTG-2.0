@@ -34,24 +34,52 @@ export function LoginPage({ onAuthenticated }) {
   return (
     <main className="login-page">
       <div className="login-layout">
+
         <section className="login-brand-panel" aria-labelledby="page-title">
-          <BrandMark inverted />
-          <p className="eyebrow">NTG role portal</p>
-          <h1 id="page-title">Transport visibility for every shipment</h1>
-          <p>
-            A corporate logistics workspace for customers, drivers, and NTG operators to keep shipment status,
-            events, ETA, and support context connected.
-          </p>
-          <div className="login-capability-grid" aria-label="Portal areas">
-            <span>Customer shipment overview</span>
-            <span>Driver event updates</span>
-            <span>Operator control tower</span>
-            <span>Tracking timeline</span>
+          <div className="login-brand-top">
+            <BrandMark inverted />
+          </div>
+
+          <div className="login-brand-body">
+            <p className="eyebrow">NTG Portal</p>
+            <h1 id="page-title">Vi hjælper dit gods på vej</h1>
+            <p>
+              Global transport og logistik fra vejtransport til søfragt — samlet i ét workspace for kunder, chauffører og operatører.
+            </p>
+          </div>
+
+          <div className="login-brand-bottom">
+            <div className="login-stats">
+              <div className="login-stat">
+                <strong>100+</strong>
+                <span>Lande</span>
+              </div>
+              <div className="login-stat">
+                <strong>3.500+</strong>
+                <span>Medarbejdere</span>
+              </div>
+              <div className="login-stat">
+                <strong>1991</strong>
+                <span>Grundlagt</span>
+              </div>
+            </div>
+            <div className="login-services">
+              <span>Vejtransport</span>
+              <span>Søfragt</span>
+              <span>Luftfragt</span>
+              <span>Express</span>
+              <span>Lagerlogistik</span>
+            </div>
           </div>
         </section>
 
         <section className="login-panel" aria-labelledby="login-title">
           <div className="login-panel-inner">
+
+            <div className="login-form-logo">
+              <BrandMark />
+            </div>
+
             <div>
               <p className="eyebrow">Welcome back</p>
               <h2 id="login-title">Sign in</h2>
@@ -66,7 +94,7 @@ export function LoginPage({ onAuthenticated }) {
                   id="email"
                   inputMode="email"
                   onChange={(event) => setEmail(event.target.value)}
-                  placeholder="name@company.com"
+                  placeholder="name@ntg.com"
                   type="email"
                   value={email}
                 />
@@ -97,11 +125,23 @@ export function LoginPage({ onAuthenticated }) {
               {error ? <p className="form-error" role="alert">{error}</p> : null}
 
               <button className="button-primary" disabled={isSubmitting} type="submit">
-                {isSubmitting ? 'Signing in' : 'Sign in'}
+                {isSubmitting ? 'Signing in…' : 'Sign in'}
               </button>
             </form>
+
+            <div className="login-trust">
+              <svg aria-hidden="true" fill="none" height="16" viewBox="0 0 24 24" width="16">
+                <g stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8">
+                  <path d="M12 2 3 7v5c0 5.25 3.75 10.15 9 11.35C17.25 22.15 21 17.25 21 12V7l-9-5Z" />
+                  <path d="m9 12 2 2 4-4" />
+                </g>
+              </svg>
+              Secured NTG corporate access
+            </div>
+
           </div>
         </section>
+
       </div>
     </main>
   )
