@@ -275,7 +275,6 @@ export function SignedInHeader({ active, onNavigate, onSignOut, profile, token }
     setIsOpen(false)
     onNavigate(path)
   }
-  const hasNotificationInbox = canUseNotificationInbox(profile)
 
   return (
     <header className="site-header signed-in-header">
