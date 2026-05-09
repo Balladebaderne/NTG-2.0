@@ -2008,6 +2008,77 @@ p {
   padding: 16px 20px 24px;
 }
 
+.driver-availability-toggle {
+  align-items: center;
+  border: 2px solid transparent;
+  border-radius: 999px;
+  display: inline-flex;
+  font-size: 0.85rem;
+  font-weight: 600;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 8px 16px 8px 10px;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.driver-availability-toggle.is-available {
+  background: #eef7df;
+  border-color: rgba(155, 205, 47, 0.4);
+  color: #3a6808;
+}
+
+.driver-availability-toggle.is-available:hover:not(:disabled) {
+  background: #ddf0b8;
+  border-color: var(--color-accent-green);
+}
+
+.driver-availability-toggle.is-unavailable {
+  background: var(--color-section-bg);
+  border-color: var(--color-border);
+  color: var(--color-text-muted);
+}
+
+.driver-availability-toggle.is-unavailable:hover:not(:disabled) {
+  background: #e4e9f0;
+  border-color: var(--color-border-strong);
+}
+
+.driver-availability-dot {
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+  height: 10px;
+  width: 10px;
+}
+
+.is-available .driver-availability-dot {
+  background: var(--color-accent-green);
+}
+
+.is-unavailable .driver-availability-dot {
+  background: var(--color-text-light);
+}
+
+.driver-availability-label {
+  display: none;
+}
+
+.driver-availability-state {
+  font-weight: 700;
+}
+
+@media (min-width: 480px) {
+  .driver-availability-label {
+    display: inline;
+    font-weight: 400;
+    opacity: 0.75;
+  }
+
+  .driver-availability-state {
+    display: none;
+  }
+}
+
 .driver-shipment-select {
   display: flex;
   flex-direction: column;

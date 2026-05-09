@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react'
+import { getDriver, updateDriverAvailability } from '../clients/driversClient'
 import { getDriverPoints } from '../clients/loyaltyClient'
 import { listShipments } from '../clients/shipmentsClient'
 import { createTrackingEvent, getLatestTracking } from '../clients/trackingClient'
@@ -26,12 +27,12 @@ function driverIdFor(profile) {
 }
 
 const QUICK_ACTIONS = [
-  { eventType: 'goods_loaded_pickup_confirmed', label: 'Afhentning bekræftet', tone: 'blue' },
-  { eventType: 'departed_origin_terminal', label: 'Afgang terminal', tone: 'blue' },
-  { eventType: 'arrived_destination_terminal', label: 'Ankomst terminal', tone: 'blue' },
-  { eventType: 'in_transit_milestone', label: 'Grænse passeret', tone: 'blue' },
-  { eventType: 'goods_delivered', label: 'Leveret', tone: 'green' },
-  { eventType: 'delay_logged', label: 'Forsinkelse', tone: 'warning' },
+  { eventType: 'goods_loaded_pickup_confirmed', label: 'Afhentning bekræftet', tone: 'blue', order: 50 },
+  { eventType: 'departed_origin_terminal', label: 'Afgang terminal', tone: 'blue', order: 70 },
+  { eventType: 'in_transit_milestone', label: 'Grænse passeret', tone: 'blue', order: 80, repeatable: true },
+  { eventType: 'arrived_destination_terminal', label: 'Ankomst terminal', tone: 'blue', order: 90 },
+  { eventType: 'goods_delivered', label: 'Leveret', tone: 'green', order: 120 },
+  { eventType: 'delay_logged', label: 'Forsinkelse', tone: 'warning', sideEvent: true },
 ]
 
 // Orden hændelserne skal ske i (fra tracking service)
@@ -160,6 +161,16 @@ function DriverQuickActions({ initialShipmentId, onSaved, profile, shipments, to
     }
   }
 
+  const tracking = trackingByShipmentId?.get(selectedId)
+  const currentOrder = EVENT_ORDER[tracking?.latestEvent?.eventType] || 0
+  const isCompleted = currentOrder >= 120
+
+  const validActions = QUICK_ACTIONS.filter((action) => {
+    if (action.sideEvent) return currentOrder > 0
+    if (action.repeatable) return action.order >= currentOrder
+    return action.order > currentOrder
+  })
+
   return (
     <div className="driver-quick-actions">
       {shipments.length > 1 && (
@@ -175,20 +186,24 @@ function DriverQuickActions({ initialShipmentId, onSaved, profile, shipments, to
         </label>
       )}
 
-      <div className="driver-action-grid">
-        {QUICK_ACTIONS.map((action) => (
-          <button
-            key={action.eventType}
-            className={`driver-action-btn driver-tone-${action.tone}`}
-            disabled={!!busy || !selectedId}
-            onClick={() => handleAction(action.eventType)}
-            type="button"
-          >
-            <span className="driver-action-label">{action.label}</span>
-            {busy === action.eventType && <span className="driver-action-busy">...</span>}
-          </button>
-        ))}
-      </div>
+      {isCompleted ? (
+        <div className="driver-result driver-result-ok">Sending er afsluttet og leveret.</div>
+      ) : (
+        <div className="driver-action-grid">
+          {validActions.map((action) => (
+            <button
+              key={action.eventType}
+              className={`driver-action-btn driver-tone-${action.tone}`}
+              disabled={!!busy || !selectedId}
+              onClick={() => handleAction(action.eventType)}
+              type="button"
+            >
+              <span className="driver-action-label">{action.label}</span>
+              {busy === action.eventType && <span className="driver-action-busy">...</span>}
+            </button>
+          ))}
+        </div>
+      )}
 
       <div className="driver-note-area">
         {!showNote && (
@@ -221,6 +236,46 @@ function DriverQuickActions({ initialShipmentId, onSaved, profile, shipments, to
   )
 }
 
+function DriverAvailabilityToggle({ profile, token }) {
+  const [available, setAvailable] = useState(null)
+  const [busy, setBusy] = useState(false)
+
+  useEffect(() => {
+    getDriver(driverIdFor(profile), { token })
+      .then((driver) => setAvailable(driver.available))
+      .catch(() => setAvailable(null))
+  }, [profile?.id, token])
+
+  async function handleToggle() {
+    if (busy || available === null) return
+    const next = !available
+    setBusy(true)
+    try {
+      await updateDriverAvailability(driverIdFor(profile), next, { token })
+      setAvailable(next)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  if (available === null) return null
+
+  return (
+    <button
+      className={`driver-availability-toggle ${available ? 'is-available' : 'is-unavailable'}`}
+      disabled={busy}
+      onClick={handleToggle}
+      type="button"
+    >
+      <span className="driver-availability-dot" />
+      <span className="driver-availability-label">
+        {available ? 'Ledig — tryk for at sætte dig utilgængelig' : 'Ikke ledig — tryk for at sætte dig ledig'}
+      </span>
+      <span className="driver-availability-state">{available ? 'Ledig' : 'Utilgængelig'}</span>
+    </button>
+  )
+}
+
 export function DriverDashboardPage({ onNavigate, onSignOut, profile, token }) {
   const state = useDriverData({ profile, token })
   const trackingByShipmentId = useMemo(
@@ -244,6 +299,7 @@ export function DriverDashboardPage({ onNavigate, onSignOut, profile, token }) {
             : active === 0 ? `Alle ${completed} sendinger er afsluttet`
             : `${active} aktiv${active !== 1 ? 'e' : ''} sending${active !== 1 ? 'er' : ''}${completed > 0 ? ` · ${completed} afsluttet` : ''}`}
         </p>
+        <DriverAvailabilityToggle profile={profile} token={token} />
       </div>
 
       {state.errors.length > 0 && (
