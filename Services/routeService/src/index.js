@@ -1,6 +1,6 @@
 const app = require('./app')
 const { ensureSchema, pool } = require('./db')
-const { startTrackingEventsConsumer } = require('./services/trackingEventsConsumer')
+const { startTrackingEventsConsumer } = require('./modules/trackingEventsConsumer')
 
 const PORT = process.env.PORT || 5000
 
