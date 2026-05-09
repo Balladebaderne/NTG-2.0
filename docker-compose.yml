@@ -102,6 +102,7 @@ services:
     environment:
       - PORT=5000
       - MONGODB_URI=mongodb://shipments_db:27017/shipments_db
+      - DRIVER_SERVICE_URL=http://driver-service:5001
     depends_on:
       - shipments_db
     networks:
