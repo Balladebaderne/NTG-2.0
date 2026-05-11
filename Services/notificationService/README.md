@@ -21,14 +21,26 @@ This keeps the notification service independent while the Shipment model is stil
 For each delayed Shipment, the service creates:
 
 - one customer-facing notification for `receiverCustomerId`
+- one operations notification for `admin`
 - one operations notification for `support`
 - one operations notification for `logistics`
+
+When a driver registers `delay_logged` for a Shipment, `tracking-service` calls
+`POST /notifications/driver-delay` with service authentication. That creates
+role-targeted `driver_delay_logged` notifications for the operations roles without
+waiting for the scheduled delay scanner.
+
+When a driver registers `goods_delivered`, `tracking-service` calls
+`POST /notifications/driver-delivery` with service authentication. That creates
+role-targeted `driver_delivery_logged` notifications for the same operations roles.
 
 ## API
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/notifications` | List notifications. Filter with `?receiverCustomerId=...`, `?recipientRole=support`, `?recipientRole=logistics`, and `?unreadOnly=true` |
+| `GET` | `/notifications` | List notifications. Filter with `?receiverCustomerId=...`, `?recipientRole=admin`, `?recipientRole=support`, `?recipientRole=logistics`, and `?unreadOnly=true` |
+| `POST` | `/notifications/driver-delay` | Create operations notifications from a driver-reported delay |
+| `POST` | `/notifications/driver-delivery` | Create operations notifications from a driver-reported delivery |
 | `POST` | `/notifications/scan-delays` | Scan in-transit Shipments and create missing delay notifications |
 | `PATCH` | `/notifications/:id/read` | Mark a notification as read |
 | `GET` | `/health` | Health check |

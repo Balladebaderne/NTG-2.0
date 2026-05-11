@@ -2,6 +2,10 @@ const express = require('express')
 
 const TrackingEvent = require('../models/TrackingEvent')
 const { requireWriteAuth } = require('../middleware/requireWriteAuth')
+const {
+  dispatchDriverDelayNotification,
+  dispatchDriverDeliveryNotification,
+} = require('../services/notificationsClient')
 const { syncShipmentStatus, verifyShipmentExists } = require('../services/shipmentsClient')
 const { publishTrackingEvent } = require('../services/trackingEventsPublisher')
 
@@ -89,8 +93,20 @@ router.post('/events', requireWriteAuth, async (req, res) => {
     const trackingEventPublish = duplicate
       ? { status: 'skipped', reason: 'duplicate idempotencyKey' }
       : await publishTrackingEvent(event)
+    const driverDelayNotification = duplicate
+      ? { status: 'skipped', reason: 'duplicate idempotencyKey' }
+      : await dispatchDriverDelayNotification(event)
+    const driverDeliveryNotification = duplicate
+      ? { status: 'skipped', reason: 'duplicate idempotencyKey' }
+      : await dispatchDriverDeliveryNotification(event)
 
-    res.status(201).json({ event, shipmentStatusSync, trackingEventPublish })
+    res.status(201).json({
+      event,
+      shipmentStatusSync,
+      trackingEventPublish,
+      driverDelayNotification,
+      driverDeliveryNotification,
+    })
   } catch (err) {
     sendError(res, err)
   }

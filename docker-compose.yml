@@ -139,6 +139,7 @@ services:
       - PORT=5000
       - DATABASE_URL=postgres://postgres:postgres@tracking_db:5432/tracking_db
       - SHIPMENTS_SERVICE_URL=http://shipments-service:5000
+      - NOTIFICATION_SERVICE_URL=http://notification-service:5002
       - VERIFY_SHIPMENTS=true
       - SHIPMENT_STATUS_SYNC_ENABLED=true
       - HTTP_TIMEOUT_SECONDS=3
@@ -153,6 +154,8 @@ services:
       - SERVICE_AUTH_TOKEN=local-service-token-change-me
     depends_on:
       tracking_db:
+        condition: service_healthy
+      notification-service:
         condition: service_healthy
     networks:
       - web

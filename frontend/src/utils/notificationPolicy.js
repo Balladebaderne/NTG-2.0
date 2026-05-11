@@ -1,5 +1,5 @@
 const NOTIFICATION_INBOX_POLICIES = {
-  admin: {},
+  admin: { recipientRole: 'admin' },
   logistics: { recipientRole: 'logistics' },
   support: { recipientRole: 'support' },
 }

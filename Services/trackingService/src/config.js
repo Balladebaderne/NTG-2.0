@@ -5,6 +5,7 @@ function envBool(name, defaultValue) {
 }
 
 module.exports = {
+  notificationServiceUrl: (process.env.NOTIFICATION_SERVICE_URL || 'http://notification-service:5002').replace(/\/$/, ''),
   shipmentsServiceUrl: (process.env.SHIPMENTS_SERVICE_URL || 'http://shipments-service:5000').replace(/\/$/, ''),
   verifyShipments: envBool('VERIFY_SHIPMENTS', true),
   shipmentStatusSyncEnabled: envBool('SHIPMENT_STATUS_SYNC_ENABLED', true),
