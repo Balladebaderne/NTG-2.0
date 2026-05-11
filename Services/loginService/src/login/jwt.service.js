@@ -18,6 +18,9 @@ function createJwtService({ expiresIn, secret }) {
         },
       )
     },
+    verifyToken(token) {
+      return jwt.verify(token, secret)
+    },
   }
 }
 

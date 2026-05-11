@@ -1,3 +1,5 @@
+import { apiRequest } from './httpClient'
+
 const BASE_URL = import.meta.env.VITE_BACKEND_URL || ''
 
 export async function login(credentials) {
@@ -20,4 +22,12 @@ export async function login(credentials) {
   }
 
   return payload
+}
+
+export function createUser(user, { token } = {}) {
+  return apiRequest('/auth/users', {
+    body: user,
+    method: 'POST',
+    token,
+  })
 }
