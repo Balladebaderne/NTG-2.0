@@ -27,15 +27,15 @@ function driverIdFor(profile) {
 }
 
 const QUICK_ACTIONS = [
-  { eventType: 'goods_loaded_pickup_confirmed', label: 'Afhentning bekræftet', tone: 'blue', order: 50 },
-  { eventType: 'departed_origin_terminal', label: 'Afgang terminal', tone: 'blue', order: 70 },
-  { eventType: 'in_transit_milestone', label: 'Grænse passeret', tone: 'blue', order: 80, repeatable: true },
-  { eventType: 'arrived_destination_terminal', label: 'Ankomst terminal', tone: 'blue', order: 90 },
-  { eventType: 'goods_delivered', label: 'Leveret', tone: 'green', order: 120 },
-  { eventType: 'delay_logged', label: 'Forsinkelse', tone: 'warning', sideEvent: true },
+  { eventType: 'goods_loaded_pickup_confirmed', label: 'Pickup confirmed', tone: 'blue', order: 50 },
+  { eventType: 'departed_origin_terminal', label: 'Departed terminal', tone: 'blue', order: 70 },
+  { eventType: 'in_transit_milestone', label: 'Border crossed', tone: 'blue', order: 80, repeatable: true },
+  { eventType: 'arrived_destination_terminal', label: 'Arrived terminal', tone: 'blue', order: 90 },
+  { eventType: 'goods_delivered', label: 'Delivered', tone: 'green', order: 120 },
+  { eventType: 'delay_logged', label: 'Delay', tone: 'warning', sideEvent: true },
 ]
 
-// Orden hændelserne skal ske i (fra tracking service)
+// Event order enforced by the tracking service.
 const EVENT_ORDER = {
   shipment_order_created: 10,
   transport_planned_carrier_assigned: 20,
@@ -51,7 +51,7 @@ const EVENT_ORDER = {
   goods_delivered: 120,
 }
 
-// Obligatoriske hændelser der automatisk oprettes hvis de mangler
+// Required events that are created automatically when missing.
 const REQUIRED_FLOW = [
   { eventType: 'shipment_order_created', order: 10 },
   { eventType: 'transport_planned_carrier_assigned', order: 20 },
@@ -132,7 +132,6 @@ function DriverQuickActions({ initialShipmentId, onSaved, profile, shipments, to
       const currentOrder = EVENT_ORDER[latestEventType] || 0
       const targetOrder = EVENT_ORDER[eventType] || 0
 
-      // Auto-indsæt obligatoriske forudsætningshændelser hvis de mangler
       if (targetOrder > 0) {
         const prereqsNeeded = REQUIRED_FLOW.filter(
           (req) => req.order < targetOrder && req.order > currentOrder
@@ -150,7 +149,7 @@ function DriverQuickActions({ initialShipmentId, onSaved, profile, shipments, to
         occurredAt: new Date().toISOString(),
       }, { token })
 
-      setResult({ ok: true, message: 'Registreret!' })
+      setResult({ ok: true, message: 'Registered!' })
       setNote('')
       setShowNote(false)
       onSaved?.()
@@ -175,7 +174,7 @@ function DriverQuickActions({ initialShipmentId, onSaved, profile, shipments, to
     <div className="driver-quick-actions">
       {shipments.length > 1 && (
         <label className="driver-shipment-select">
-          <span>Sending</span>
+          <span>Shipment</span>
           <select value={selectedId} onChange={(e) => { setSelectedId(e.target.value); setResult(null) }}>
             {shipments.map((s) => (
               <option key={s._id} value={s._id}>
@@ -187,7 +186,7 @@ function DriverQuickActions({ initialShipmentId, onSaved, profile, shipments, to
       )}
 
       {isCompleted ? (
-        <div className="driver-result driver-result-ok">Sending er afsluttet og leveret.</div>
+        <div className="driver-result driver-result-ok">Shipment is completed and delivered.</div>
       ) : (
         <div className="driver-action-grid">
           {validActions.map((action) => (
@@ -208,20 +207,20 @@ function DriverQuickActions({ initialShipmentId, onSaved, profile, shipments, to
       <div className="driver-note-area">
         {!showNote && (
           <button className="driver-note-toggle" onClick={() => setShowNote(true)} type="button">
-            + Tilføj note (valgfrit)
+            + Add note (optional)
           </button>
         )}
         {showNote && (
           <>
             <textarea
               className="driver-note-input"
-              placeholder="Skriv en kort note..."
+              placeholder="Write a short note..."
               rows={3}
               value={note}
               onChange={(e) => setNote(e.target.value)}
             />
             <button className="driver-note-toggle" onClick={() => { setShowNote(false); setNote('') }} type="button">
-              − Fjern note
+              - Remove note
             </button>
           </>
         )}
@@ -239,40 +238,90 @@ function DriverQuickActions({ initialShipmentId, onSaved, profile, shipments, to
 function DriverAvailabilityToggle({ profile, token }) {
   const [available, setAvailable] = useState(null)
   const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    let isCurrent = true
+    setError('')
+    setLoading(true)
+
     getDriver(driverIdFor(profile), { token })
-      .then((driver) => setAvailable(driver.available))
-      .catch(() => setAvailable(null))
+      .then((driver) => {
+        if (!isCurrent) return
+        setAvailable(driver.available)
+      })
+      .catch((err) => {
+        if (!isCurrent) return
+        setAvailable(null)
+        setError(err.message)
+      })
+      .finally(() => {
+        if (isCurrent) setLoading(false)
+      })
+
+    return () => {
+      isCurrent = false
+    }
   }, [profile?.id, token])
 
   async function handleToggle() {
     if (busy || available === null) return
     const next = !available
     setBusy(true)
+    setError('')
     try {
       await updateDriverAvailability(driverIdFor(profile), next, { token })
       setAvailable(next)
+    } catch (err) {
+      setError(err.message)
     } finally {
       setBusy(false)
     }
   }
 
-  if (available === null) return null
+  if (loading) {
+    return <div className="driver-availability-loading" role="status">Loading availability status...</div>
+  }
+
+  if (available === null) {
+    return <div className="driver-result driver-result-err" role="alert">Could not load availability status.</div>
+  }
 
   return (
-    <button
-      className={`driver-availability-toggle ${available ? 'is-available' : 'is-unavailable'}`}
-      disabled={busy}
-      onClick={handleToggle}
-      type="button"
-    >
-      <span className="driver-availability-dot" />
-      <span className="driver-availability-label">
-        {available ? 'Ledig — tryk for at sætte dig utilgængelig' : 'Ikke ledig — tryk for at sætte dig ledig'}
-      </span>
-      <span className="driver-availability-state">{available ? 'Ledig' : 'Utilgængelig'}</span>
-    </button>
+    <>
+      <button
+        aria-label={available ? 'You are available. Tap to set yourself unavailable.' : 'You are not available. Tap to set yourself available.'}
+        aria-pressed={available}
+        className={`driver-availability-toggle ${available ? 'is-available' : 'is-unavailable'}`}
+        disabled={busy}
+        onClick={handleToggle}
+        type="button"
+      >
+        <span className="driver-availability-dot" />
+        <span className="driver-availability-label">
+          {available ? 'Available - tap to set yourself unavailable' : 'Not available - tap to set yourself available'}
+        </span>
+        <span className="driver-availability-state">{available ? 'Available' : 'Unavailable'}</span>
+      </button>
+      {error ? <div className="driver-result driver-result-err" role="alert">{error}</div> : null}
+    </>
+  )
+}
+
+function DriverAvailabilityPanel({ profile, token }) {
+  return (
+    <section className="driver-main-panel driver-availability-panel" aria-labelledby="driver-availability-heading">
+      <div className="panel-heading">
+        <div>
+          <span>Availability status</span>
+          <h2 id="driver-availability-heading">Are you available?</h2>
+        </div>
+      </div>
+      <div className="driver-availability-body">
+        <DriverAvailabilityToggle profile={profile} token={token} />
+      </div>
+    </section>
   )
 }
 
@@ -282,12 +331,6 @@ export function DriverDashboardPage({ onNavigate, onSignOut, profile, token }) {
     () => new Map(state.trackingSummaries.map((s) => [s.shipmentId, s])),
     [state.trackingSummaries]
   )
-  const completed = state.shipments.filter((s) => s.status === 'received').length
-  const active = state.shipments.length - completed
-
-  const hour = new Date().getHours()
-  const greeting = hour < 12 ? 'God morgen' : hour < 17 ? 'God dag' : 'God aften'
-  const firstName = profile?.name?.split(' ')[0] || 'chauffør'
 
   return (
     <AppShell active="driver-dashboard" onNavigate={onNavigate} onSignOut={onSignOut} profile={profile} token={token}>
@@ -295,72 +338,56 @@ export function DriverDashboardPage({ onNavigate, onSignOut, profile, token }) {
         <div>
           <p className="eyebrow">Driver overview</p>
           <h1>Assigned shipments today</h1>
-          <p>Submit pickup, terminal, border, delay, location, and delivery events for shipments assigned to you.</p>
+          <p>Review assigned shipments and set whether you are available for new driver capacity.</p>
         </div>
       </section>
 
       {state.errors.length > 0 && (
         <Notice tone="warning">
-          <strong>Der opstod en fejl.</strong>
+          <strong>An error occurred.</strong>
           <ul>{state.errors.map((e) => <li key={e}>{e}</li>)}</ul>
         </Notice>
       )}
 
+      <DriverAvailabilityPanel profile={profile} token={token} />
+
       {state.loading ? <LoadingGrid count={2} /> : null}
 
       {!state.loading && state.shipments.length === 0 && (
-        <EmptyState message="Ingen sendinger er tildelt din chaufførprofil." />
+        <EmptyState message="No shipments are assigned to your driver profile." />
       )}
 
       {!state.loading && state.shipments.length > 0 && (
-        <>
-          <section className="driver-main-panel">
-            <div className="panel-heading">
-              <div>
-                <span>Hurtig registrering</span>
-                <h2>Hvad er sket?</h2>
-              </div>
+        <section className="driver-main-panel">
+          <div className="panel-heading">
+            <div>
+              <span>My shipments</span>
+              <h2>Assigned routes</h2>
             </div>
-            <DriverQuickActions
-              onSaved={state.loadDriverData}
-              profile={profile}
-              shipments={state.shipments}
-              token={token}
-              trackingByShipmentId={trackingByShipmentId}
-            />
-          </section>
-
-          <section className="driver-main-panel">
-            <div className="panel-heading">
-              <div>
-                <span>Mine sendinger</span>
-                <h2>Tildelte ruter</h2>
-              </div>
-            </div>
-            <div className="driver-card-list">
-              {state.shipments.map((shipment) => {
-                const tracking = trackingByShipmentId.get(shipment._id)
-                return (
-                  <button
-                    key={shipment._id}
-                    className="driver-shipment-row"
-                    onClick={() => onNavigate(`/driver/shipments/${shipment._id}/update`)}
-                    type="button"
-                  >
-                    <div className="driver-shipment-row-left">
-                      <strong>{compactId(shipment._id)}</strong>
-                      <span>{tracking?.trackingStatusLabel || formatStatus(shipment.status)}</span>
-                      <small>ETA: {formatDateTime(shipment.estimatedArrivalAt)}</small>
-                    </div>
-                    <span className={`status-badge status-${String(shipment.status || '').replaceAll('_', '-')}`}>
-                      {formatStatus(shipment.status)}
-                    </span>
-                  </button>
-                )
-              })}
-            </div>
-          </section>
-        </>
+          </div>
+          <div className="driver-card-list">
+            {state.shipments.map((shipment) => {
+              const tracking = trackingByShipmentId.get(shipment._id)
+              return (
+                <button
+                  key={shipment._id}
+                  className="driver-shipment-row"
+                  onClick={() => onNavigate(`/driver/shipments/${shipment._id}/update`)}
+                  type="button"
+                >
+                  <div className="driver-shipment-row-left">
+                    <strong>{compactId(shipment._id)}</strong>
+                    <span>{tracking?.trackingStatusLabel || formatStatus(shipment.status)}</span>
+                    <small>ETA: {formatDateTime(shipment.estimatedArrivalAt)}</small>
+                  </div>
+                  <span className={`status-badge status-${String(shipment.status || '').replaceAll('_', '-')}`}>
+                    {formatStatus(shipment.status)}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+        </section>
       )}
     </AppShell>
   )
@@ -381,7 +408,7 @@ export function DriverAssignedShipmentsPage({ onNavigate, onSignOut, profile, to
 
       {state.loading ? <LoadingGrid count={4} /> : null}
       {!state.loading && state.shipments.length === 0 && (
-        <EmptyState message="Ingen sendinger er tildelt din chaufførprofil." />
+        <EmptyState message="No shipments are assigned to your driver profile." />
       )}
       {!state.loading && state.shipments.length > 0 && (
         <section className="driver-main-panel">
@@ -431,14 +458,14 @@ export function DriverShipmentUpdatePage({ onNavigate, onSignOut, profile, shipm
 
       {state.loading ? <LoadingGrid count={2} /> : null}
       {!state.loading && !shipment && (
-        <EmptyState message="Denne sending er ikke tildelt din chaufførprofil." />
+        <EmptyState message="This shipment is not assigned to your driver profile." />
       )}
       {!state.loading && shipment && (
         <section className="driver-main-panel">
           <div className="panel-heading">
             <div>
-              <span>Registrer hændelse</span>
-              <h2>Hvad er sket?</h2>
+              <span>Register event</span>
+              <h2>What happened?</h2>
             </div>
           </div>
           <DriverQuickActions

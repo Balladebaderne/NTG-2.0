@@ -146,6 +146,44 @@ function OperatorMetrics({ state }) {
   )
 }
 
+function DriverAvailabilityList({ drivers, limit, onToggle }) {
+  const visibleDrivers = limit ? drivers.slice(0, limit) : drivers
+
+  if (drivers.length === 0) {
+    return <EmptyState compact message="No driver records are available." />
+  }
+
+  return (
+    <ul className="split-list driver-capacity-list">
+      {visibleDrivers.map((driver) => {
+        const label = driver.available ? 'Available' : 'Unavailable'
+        const className = driver.available ? 'driver-available-pill' : 'driver-unavailable-pill'
+
+        return (
+          <li key={driver.id}>
+            <div>
+              <strong>{driver.name}</strong>
+              <small>{driver.email} / {driver.phone}</small>
+            </div>
+            {onToggle ? (
+              <button
+                aria-label={`Set ${driver.name} ${driver.available ? 'unavailable' : 'available'}`}
+                className={className}
+                onClick={() => onToggle(driver)}
+                type="button"
+              >
+                {label}
+              </button>
+            ) : (
+              <span className={className}>{label}</span>
+            )}
+          </li>
+        )
+      })}
+    </ul>
+  )
+}
+
 function OperatorHero({ children, onRefresh, state, title }) {
   return (
     <section className="workspace-hero">
@@ -486,7 +524,7 @@ export function OperatorDashboardPage({ onNavigate, onSignOut, profile, token })
             </aside>
           </div>
 
-          <div className="panel-grid equal">
+          <div className="panel-grid three">
             <section className="panel">
               <div className="panel-heading">
                 <div>
@@ -509,6 +547,19 @@ export function OperatorDashboardPage({ onNavigate, onSignOut, profile, token })
                 <li><div><strong>Data discrepancies</strong><small>Missing goods or route records</small></div><span>{formatNumber(state.discrepancies.length)}</span></li>
                 <li><div><strong>Missing events</strong><small>Shipments with incomplete operational records</small></div><span>{formatNumber(state.missingEvents.length)}</span></li>
               </ul>
+            </section>
+
+            <section className="panel">
+              <div className="panel-heading">
+                <div>
+                  <span>Driver service</span>
+                  <h2>Availability</h2>
+                </div>
+                <button className="button-secondary compact" onClick={() => onNavigate('/operator/drivers')} type="button">
+                  Open drivers
+                </button>
+              </div>
+              <DriverAvailabilityList drivers={state.drivers} limit={5} />
             </section>
           </div>
         </>
@@ -620,19 +671,7 @@ export function OperatorDriversPage({ onNavigate, onSignOut, profile, token }) {
               <h2>Drivers</h2>
             </div>
           </div>
-          <ul className="split-list">
-            {state.drivers.map((driver) => (
-              <li key={driver.id}>
-                <div>
-                  <strong>{driver.name}</strong>
-                  <small>{driver.email} / {driver.phone}</small>
-                </div>
-                <button className="button-secondary compact" onClick={() => toggleDriver(driver)} type="button">
-                  {driver.available ? 'Available' : 'Unavailable'}
-                </button>
-              </li>
-            ))}
-          </ul>
+          <DriverAvailabilityList drivers={state.drivers} onToggle={toggleDriver} />
         </section>
       )}
     </AppShell>

@@ -2188,6 +2188,16 @@ p {
   padding: 0 10px;
 }
 
+button.driver-available-pill,
+button.driver-unavailable-pill {
+  cursor: pointer;
+}
+
+.driver-capacity-list .driver-available-pill,
+.driver-capacity-list .driver-unavailable-pill {
+  flex: 0 0 auto;
+}
+
 /* ─── Panel aside stack (used in admin side rail) ─── */
 
 .panel-aside-stack {
@@ -2272,17 +2282,26 @@ p {
   padding: 16px 20px 24px;
 }
 
+.driver-availability-body {
+  display: grid;
+  gap: 12px;
+  padding: 16px 20px 24px;
+}
+
 .driver-availability-toggle {
   align-items: center;
   border: 2px solid transparent;
   border-radius: 999px;
   display: inline-flex;
+  flex-wrap: wrap;
   font-size: 0.85rem;
   font-weight: 600;
   gap: 8px;
-  margin-top: 12px;
+  justify-content: flex-start;
+  min-height: 52px;
   padding: 8px 16px 8px 10px;
   transition: background 0.2s, border-color 0.2s;
+  width: 100%;
 }
 
 .driver-availability-toggle.is-available {
@@ -2307,6 +2326,11 @@ p {
   border-color: var(--color-border-strong);
 }
 
+.driver-availability-toggle:disabled {
+  cursor: progress;
+  opacity: 0.78;
+}
+
 .driver-availability-dot {
   border-radius: 50%;
   display: inline-block;
@@ -2329,6 +2353,16 @@ p {
 
 .driver-availability-state {
   font-weight: 700;
+}
+
+.driver-availability-loading {
+  background: var(--color-section-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-medium);
+  color: var(--color-text-muted);
+  font-size: 0.95rem;
+  font-weight: 700;
+  padding: 14px 16px;
 }
 
 @media (min-width: 480px) {
