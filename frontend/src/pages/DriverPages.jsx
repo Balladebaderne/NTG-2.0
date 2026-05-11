@@ -581,12 +581,10 @@ export function DriverEventsPage({ onNavigate, onSignOut, profile, token }) {
                 </div>
                 <span>{formatDateTime(summary.lastUpdatedAt)}</span>
               </div>
-              <Timeline events={asArray(summary.history).slice(-4)} />
             </section>
           ))}
         </div>
       ) : null}
-      {!state.loading && state.trackingSummaries.length === 0 ? <EmptyState message="No route events are available for assigned shipments." /> : null}
     </AppShell>
   )
 }
