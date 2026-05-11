@@ -14,6 +14,7 @@ function createAuthService({ jwtService, usersRepository }) {
 
       const tokenUser = {
         id: user.id,
+        customerId: user.customerId || null,
         email: user.email,
         name: user.name,
         role: user.role,

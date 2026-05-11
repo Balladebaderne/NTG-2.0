@@ -25,7 +25,9 @@ async function settle(label, task) {
 }
 
 function customerIdFor(profile) {
-  return profile?.role === 'customer' ? profile.id : 'customer-1'
+  if (profile?.role === 'logistics') return profile.customerId || 'customer-1'
+  if (profile?.role === 'customer') return profile.id
+  return 'customer-1'
 }
 
 function countDelayed(shipments) {
