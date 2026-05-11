@@ -63,6 +63,48 @@ const REQUIRED_FLOW = [
   { eventType: 'truck_arrived_delivery', order: 110 },
 ]
 
+const ACTION_FEEDBACK = {
+  goods_loaded_pickup_confirmed: {
+    detail: 'Pickup is confirmed and the shipment flow has been updated.',
+    title: 'Pickup registered',
+  },
+  departed_origin_terminal: {
+    detail: 'Route progress was updated.',
+    points: 10,
+    title: 'Terminal departure registered',
+  },
+  in_transit_milestone: {
+    detail: 'Route progress was updated.',
+    points: 10,
+    title: 'Milestone registered',
+  },
+  arrived_destination_terminal: {
+    detail: 'Route progress was updated.',
+    points: 10,
+    title: 'Terminal arrival registered',
+  },
+  goods_delivered: {
+    detail: 'Delivery confirmed. The operations team has been notified.',
+    points: 50,
+    title: 'Shipment delivered',
+  },
+  delay_logged: {
+    detail: 'Admin and support have been notified about the delay.',
+    title: 'Delay reported',
+    tone: 'warning',
+  },
+}
+
+function feedbackForAction(eventType, fallbackLabel) {
+  const config = ACTION_FEEDBACK[eventType] || {}
+  return {
+    detail: config.detail || 'The shipment event has been registered.',
+    points: config.points || 0,
+    title: config.title || fallbackLabel || 'Event registered',
+    tone: config.tone || 'success',
+  }
+}
+
 function useDriverData({ profile, token }) {
   const [state, setState] = useState({
     errors: [],
@@ -71,9 +113,9 @@ function useDriverData({ profile, token }) {
     trackingSummaries: [],
   })
 
-  async function loadDriverData() {
+  async function loadDriverData({ silent = false } = {}) {
     const driverId = driverIdFor(profile)
-    setState((current) => ({ ...current, errors: [], loading: true }))
+    setState((current) => ({ ...current, errors: [], loading: silent ? current.loading : true }))
 
     const shipmentResult = await settle('Assigned shipments', listShipments({ filters: { driverId }, token }))
     const shipments = asArray(shipmentResult.value)
@@ -127,6 +169,7 @@ function DriverQuickActions({ initialShipmentId, onSaved, profile, shipments, to
     setResult(null)
 
     try {
+      const action = QUICK_ACTIONS.find((item) => item.eventType === eventType)
       const tracking = trackingByShipmentId?.get(selectedId)
       const latestEventType = tracking?.latestEvent?.eventType
       const currentOrder = EVENT_ORDER[latestEventType] || 0
@@ -149,10 +192,14 @@ function DriverQuickActions({ initialShipmentId, onSaved, profile, shipments, to
         occurredAt: new Date().toISOString(),
       }, { token })
 
-      setResult({ ok: true, message: 'Registered!' })
+      setResult({
+        eventType,
+        feedback: feedbackForAction(eventType, action?.label),
+        ok: true,
+      })
       setNote('')
       setShowNote(false)
-      onSaved?.()
+      onSaved?.({ silent: true })
     } catch (err) {
       setResult({ ok: false, message: err.message })
     } finally {
@@ -198,11 +245,13 @@ function DriverQuickActions({ initialShipmentId, onSaved, profile, shipments, to
               type="button"
             >
               <span className="driver-action-label">{action.label}</span>
-              {busy === action.eventType && <span className="driver-action-busy">...</span>}
+              {busy === action.eventType && <span className="driver-action-busy">Saving</span>}
             </button>
           ))}
         </div>
       )}
+
+      {result?.ok ? <DriverActionFeedback result={result} /> : null}
 
       <div className="driver-note-area">
         {!showNote && (
@@ -226,11 +275,36 @@ function DriverQuickActions({ initialShipmentId, onSaved, profile, shipments, to
         )}
       </div>
 
-      {result && (
+      {result && !result.ok && (
         <div className={`driver-result ${result.ok ? 'driver-result-ok' : 'driver-result-err'}`}>
-          {result.ok ? '✓ ' : '✗ '}{result.message}
+          Could not register event: {result.message}
         </div>
       )}
+    </div>
+  )
+}
+
+function DriverActionFeedback({ result }) {
+  const feedback = result.feedback || feedbackForAction(result.eventType)
+  const hasPoints = feedback.points > 0
+
+  return (
+    <div
+      aria-live="polite"
+      className={`driver-action-feedback driver-feedback-${feedback.tone}`}
+      role="status"
+    >
+      <div className="driver-feedback-main">
+        <span className="driver-feedback-kicker">Registered</span>
+        <strong>{feedback.title}</strong>
+        <p>{feedback.detail}</p>
+      </div>
+      {hasPoints ? (
+        <div className="driver-feedback-points">
+          <span>+{feedback.points}</span>
+          <small>loyalty points</small>
+        </div>
+      ) : null}
     </div>
   )
 }
