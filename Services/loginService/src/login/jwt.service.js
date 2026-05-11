@@ -5,6 +5,7 @@ function createJwtService({ expiresIn, secret }) {
     signForUser(user) {
       return jwt.sign(
         {
+          customerId: user.customerId || null,
           email: user.email,
           name: user.name,
           role: user.role,

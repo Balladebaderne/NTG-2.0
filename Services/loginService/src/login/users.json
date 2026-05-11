@@ -33,6 +33,7 @@
   },
   {
     "id": "usr_logistics",
+    "customerId": "customer-1",
     "name": "NTG Logistics Manager",
     "email": "logistics@ntg.local",
     "password": "logistics123",

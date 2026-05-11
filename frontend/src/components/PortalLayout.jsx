@@ -136,7 +136,8 @@ const roleNav = {
 
 export function normalizeRole(role) {
   if (role === 'driver') return 'driver'
-  if (role === 'admin' || role === 'logistics' || role === 'support') return 'operator'
+  if (role === 'admin' || role === 'support') return 'operator'
+  if (role === 'logistics') return 'customer'
   return 'customer'
 }
 
