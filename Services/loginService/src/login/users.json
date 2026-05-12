@@ -16,7 +16,7 @@
     "roleLabel": "Driver"
   },
   {
-    "id": "customer-1",
+    "id": "Novo_Nordisk",
     "name": "NTG Customer",
     "email": "customer@ntg.local",
     "password": "customer123",
@@ -33,7 +33,7 @@
   },
   {
     "id": "usr_logistics",
-    "customerId": "customer-1",
+    "customerId": "Novo_Nordisk",
     "name": "NTG Logistics Manager",
     "email": "logistics@ntg.local",
     "password": "logistics123",
