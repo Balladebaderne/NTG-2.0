@@ -369,7 +369,8 @@ address {
 
 .button-primary,
 .button-secondary,
-.button-neutral {
+.button-neutral,
+.button-danger {
   align-items: center;
   border-radius: var(--radius-small);
   display: inline-flex;
@@ -380,6 +381,23 @@ address {
   padding: 0 20px;
   text-decoration: none;
   transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease, box-shadow 160ms ease;
+}
+
+.button-danger {
+  background: #dc2626;
+  border: 1px solid #dc2626;
+  color: #ffffff;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.button-danger:hover {
+  background: #b91c1c;
+  border-color: #b91c1c;
+}
+
+.button-danger:disabled {
+  opacity: 0.6;
 }
 
 .button-primary {
@@ -427,6 +445,7 @@ address {
 .button-primary:focus-visible,
 .button-secondary:focus-visible,
 .button-neutral:focus-visible,
+.button-danger:focus-visible,
 .brand-lockup-button:focus-visible,
 .notification-trigger:focus-visible,
 .site-nav button:focus-visible,
