@@ -9,14 +9,27 @@ export function notificationInboxRole(profileOrRole) {
   return String(role || '').trim().toLowerCase()
 }
 
+function notificationInboxCustomerId(profileOrRole) {
+  if (!profileOrRole || typeof profileOrRole === 'string') return ''
+  return profileOrRole.customerId || profileOrRole.id || ''
+}
+
 export function canUseNotificationInbox(profileOrRole) {
+  const role = notificationInboxRole(profileOrRole)
+  if (role === 'customer') return Boolean(notificationInboxCustomerId(profileOrRole))
+
   return Object.prototype.hasOwnProperty.call(
     NOTIFICATION_INBOX_POLICIES,
-    notificationInboxRole(profileOrRole)
+    role
   )
 }
 
 export function notificationInboxFilters(profileOrRole) {
   const role = notificationInboxRole(profileOrRole)
+  if (role === 'customer') {
+    const customerId = notificationInboxCustomerId(profileOrRole)
+    return customerId ? { receiverCustomerId: customerId } : {}
+  }
+
   return { ...(NOTIFICATION_INBOX_POLICIES[role] || {}) }
 }

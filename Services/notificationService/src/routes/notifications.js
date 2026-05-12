@@ -33,6 +33,7 @@ router.post('/driver-delay', requireWriteAuth, async (req, res) => {
       driverId: req.body.driverId,
       notes: req.body.notes,
       occurredAt: req.body.occurredAt,
+      receiverCustomerId: req.body.receiverCustomerId,
       shipmentId: req.body.shipmentId,
       trackingEventId: req.body.trackingEventId,
     })

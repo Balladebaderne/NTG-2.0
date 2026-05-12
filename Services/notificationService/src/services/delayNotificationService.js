@@ -1,5 +1,5 @@
 const { findDelayedShipments } = require('./delayDetector')
-const { listInTransitShipments } = require('./shipmentsClient')
+const { getShipment, listInTransitShipments } = require('./shipmentsClient')
 const { createNotification } = require('./notificationsRepository')
 
 const OPERATION_RECIPIENT_ROLES = ['admin', 'support', 'logistics']
@@ -39,29 +39,41 @@ async function scanForDelayedShipments(now = new Date()) {
   }
 }
 
-function buildDriverDelayNotification({ driverId, notes, occurredAt, shipmentId, trackingEventId }) {
+function buildDriverDelayNotification({ driverId, notes, occurredAt, receiverCustomerId, shipmentId, trackingEventId }) {
   if (!shipmentId) {
     throw new Error('shipmentId is required')
   }
 
   const detectedAt = new Date().toISOString()
   const noteSuffix = notes ? ` Driver note: ${notes}` : ''
+  const metadata = {
+    detectedAt,
+    driverId,
+    notes,
+    occurredAt,
+    ...(receiverCustomerId ? { receiverCustomerId } : {}),
+    source: 'driver_delay_logged',
+    trackingEventId,
+  }
+  const customerNotification = receiverCustomerId ? [{
+    receiverCustomerId,
+    shipmentId,
+    type: 'driver_delay_logged',
+    title: 'Shipment delayed',
+    message: `Driver reported a delay for shipment ${shipmentId}.${noteSuffix}`,
+    metadata,
+  }] : []
 
-  return OPERATION_RECIPIENT_ROLES.map((recipientRole) => ({
+  const roleNotifications = OPERATION_RECIPIENT_ROLES.map((recipientRole) => ({
     recipientRole,
     shipmentId,
     type: 'driver_delay_logged',
     title: 'Shipment delayed',
     message: `Driver reported a delay for shipment ${shipmentId}.${noteSuffix}`,
-    metadata: {
-      detectedAt,
-      driverId,
-      notes,
-      occurredAt,
-      source: 'driver_delay_logged',
-      trackingEventId,
-    },
+    metadata,
   }))
+
+  return [...customerNotification, ...roleNotifications]
 }
 
 function buildDriverDeliveryNotification({ driverId, notes, occurredAt, shipmentId, trackingEventId }) {
@@ -90,7 +102,8 @@ function buildDriverDeliveryNotification({ driverId, notes, occurredAt, shipment
 }
 
 async function createDriverDelayNotifications(input) {
-  const notificationsToCreate = buildDriverDelayNotification(input)
+  const receiverCustomerId = input.receiverCustomerId || await receiverCustomerIdForShipment(input.shipmentId)
+  const notificationsToCreate = buildDriverDelayNotification({ ...input, receiverCustomerId })
   const createdNotifications = []
 
   for (const notification of notificationsToCreate) {
@@ -101,7 +114,19 @@ async function createDriverDelayNotifications(input) {
   return {
     created: createdNotifications.length,
     notifications: createdNotifications,
+    targetedCustomer: receiverCustomerId || null,
     targetedRoles: OPERATION_RECIPIENT_ROLES,
+  }
+}
+
+async function receiverCustomerIdForShipment(shipmentId) {
+  if (!shipmentId) return ''
+
+  try {
+    const shipment = await getShipment(shipmentId)
+    return shipment?.receiverCustomerId || ''
+  } catch {
+    return ''
   }
 }
 

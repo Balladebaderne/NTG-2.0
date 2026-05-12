@@ -16,13 +16,23 @@ async function fetchJson(url, options = {}) {
   }
 }
 
+function shipmentsBaseUrl() {
+  return process.env.SHIPMENTS_SERVICE_URL || 'http://shipments-service:5000'
+}
+
+async function getShipment(shipmentId) {
+  const encodedShipmentId = encodeURIComponent(shipmentId)
+  const url = new URL(`/shipments/${encodedShipmentId}`, shipmentsBaseUrl())
+  return fetchJson(url)
+}
+
 async function listInTransitShipments() {
-  const baseUrl = process.env.SHIPMENTS_SERVICE_URL || 'http://shipments-service:5000'
-  const url = new URL('/shipments', baseUrl)
+  const url = new URL('/shipments', shipmentsBaseUrl())
   url.searchParams.set('status', 'in_transit')
   return fetchJson(url)
 }
 
 module.exports = {
+  getShipment,
   listInTransitShipments,
 }

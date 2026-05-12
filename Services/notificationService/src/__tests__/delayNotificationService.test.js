@@ -61,6 +61,31 @@ test('builds role notifications from a driver delay event', () => {
   assert.equal(notifications[0].metadata.trackingEventId, 'event-1')
 })
 
+test('builds a customer notification from a driver delay event when receiver customer is known', () => {
+  const {
+    buildDriverDelayNotification,
+  } = require('../services/delayNotificationService')
+
+  const notifications = buildDriverDelayNotification({
+    driverId: 'driver-1',
+    notes: 'Border queue',
+    occurredAt: '2026-05-11T13:00:00.000Z',
+    receiverCustomerId: 'customer-1',
+    shipmentId: 'shipment-1',
+    trackingEventId: 'event-1',
+  })
+
+  assert.equal(notifications.length, 4)
+  assert.equal(notifications[0].receiverCustomerId, 'customer-1')
+  assert.equal(notifications[0].recipientRole, undefined)
+  assert.deepEqual(
+    notifications.slice(1).map((notification) => notification.recipientRole),
+    ['admin', 'support', 'logistics']
+  )
+  assert.equal(notifications[1].receiverCustomerId, undefined)
+  assert.equal(notifications[1].metadata.receiverCustomerId, 'customer-1')
+})
+
 test('builds role notifications from a driver delivery event', () => {
   const {
     buildDriverDeliveryNotification,
