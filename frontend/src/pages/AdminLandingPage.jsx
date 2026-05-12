@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { createUser } from '../clients/authClient'
-import { createCustomer, deleteCustomer, listCustomers } from '../clients/customersClient'
-import { createDriver, deleteDriver, listDrivers, updateDriverAvailability } from '../clients/driversClient'
+import { listCustomers } from '../clients/customersClient'
+import { listDrivers, updateDriverAvailability } from '../clients/driversClient'
 import {
   listNotifications,
   markNotificationRead,
@@ -20,7 +19,7 @@ import {
   searchTracking,
   updateTicket,
 } from '../clients/supportClient'
-import { createTrackingEvent, getLatestTracking } from '../clients/trackingClient'
+import { getLatestTracking } from '../clients/trackingClient'
 import {
   AppShell,
   EmptyState,
@@ -33,24 +32,6 @@ import { asArray, compactId, formatDateTime, formatStatus } from '../utils/forma
 
 const SHIPMENT_STATUS_OPTIONS = ['all', 'booked', 'in_transit', 'received']
 const TICKET_STATUS_OPTIONS = ['open', 'in_progress', 'escalated', 'resolved']
-const TRACKING_MILESTONES = [
-  { value: 'shipment_order_created', label: 'Shipment order created' },
-  { value: 'transport_planned_carrier_assigned', label: 'Transport planned and carrier assigned' },
-  { value: 'pickup_scheduled', label: 'Pickup scheduled' },
-  { value: 'truck_arrived_pickup', label: 'Truck arrived at pickup' },
-  { value: 'goods_loaded_pickup_confirmed', label: 'Goods loaded and pickup confirmed' },
-  { value: 'shipment_in_transit', label: 'Shipment in transit' },
-  { value: 'departed_origin_terminal', label: 'Departed origin terminal' },
-  { value: 'in_transit_milestone', label: 'In transit milestone' },
-  { value: 'delay_logged', label: 'Delay logged' },
-  { value: 'exception_logged', label: 'Exception logged' },
-  { value: 'arrived_destination_terminal', label: 'Arrived destination terminal' },
-  { value: 'out_for_delivery', label: 'Out for delivery' },
-  { value: 'truck_arrived_delivery', label: 'Truck arrived at delivery' },
-  { value: 'goods_delivered', label: 'Goods delivered' },
-  { value: 'pod_confirmed', label: 'Proof of delivery confirmed' },
-  { value: 'shipment_completed_closed', label: 'Shipment completed and closed' },
-]
 
 const SERVICE_ROWS = [
   { label: 'Shipments', owner: 'shipmentsService', purpose: 'Orders, goods, lifecycle status' },
@@ -64,10 +45,6 @@ const SERVICE_ROWS = [
 ]
 
 const initialTicketForm = { customerId: '', description: '', shipmentId: '', subject: '' }
-const initialDriverAccountForm = { email: '', name: '', password: '', phone: '' }
-const initialCustomerAccountForm = { company: '', email: '', name: '', password: '', phone: '' }
-const initialLogisticsAccountForm = { customerId: '', email: '', name: '', password: '' }
-
 function formatNumber(value) {
   return new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 }).format(value || 0)
 }
@@ -112,15 +89,7 @@ export function AdminLandingPage({ onNavigate, onSignOut, profile, token }) {
   })
   const [filters, setFilters] = useState({ query: '', status: 'all' })
   const [ticketForm, setTicketForm] = useState(initialTicketForm)
-  const [driverAccountForm, setDriverAccountForm] = useState(initialDriverAccountForm)
-  const [customerAccountForm, setCustomerAccountForm] = useState(initialCustomerAccountForm)
-  const [logisticsAccountForm, setLogisticsAccountForm] = useState(initialLogisticsAccountForm)
-  const [trackingForm, setTrackingForm] = useState({
-    eventType: 'shipment_order_created',
-    notes: '',
-    shipmentId: '',
-  })
-  const [supportSearch, setSupportSearch] = useState({
+const [supportSearch, setSupportSearch] = useState({
     error: '',
     loading: false,
     mode: 'reference',
@@ -176,10 +145,6 @@ export function AdminLandingPage({ onNavigate, onSignOut, profile, token }) {
     })
 
     if (shipments.length > 0) {
-      setTrackingForm((current) => ({
-        ...current,
-        shipmentId: current.shipmentId || shipments[0]._id,
-      }))
       setTicketForm((current) => ({
         ...current,
         customerId: current.customerId || shipments[0].receiverCustomerId || '',
@@ -187,12 +152,6 @@ export function AdminLandingPage({ onNavigate, onSignOut, profile, token }) {
       }))
     }
 
-    if (customers.length > 0) {
-      setLogisticsAccountForm((current) => ({
-        ...current,
-        customerId: current.customerId || customers[0].customerId,
-      }))
-    }
   }
 
   useEffect(() => {
@@ -294,113 +253,6 @@ export function AdminLandingPage({ onNavigate, onSignOut, profile, token }) {
     return fields.some((field) => !String(form[field] || '').trim())
   }
 
-  async function handleCreateDriverAccount(event) {
-    event.preventDefault()
-    if (missingFields(driverAccountForm, ['email', 'name', 'password', 'phone'])) {
-      setAction({ busy: '', message: 'Fill driver name, email, phone, and password.', tone: 'warning' })
-      return
-    }
-
-    const saved = await runAction(
-      'driver-account-create',
-      async () => {
-        const driver = await createDriver({
-          email: driverAccountForm.email,
-          name: driverAccountForm.name,
-          phone: driverAccountForm.phone,
-        }, { token })
-
-        try {
-          return await createUser({
-            email: driverAccountForm.email,
-            id: String(driver.id),
-            name: driverAccountForm.name,
-            password: driverAccountForm.password,
-            role: 'driver',
-          }, { token })
-        } catch (error) {
-          try {
-            await deleteDriver(driver.id, { token })
-          } catch (rollbackError) {
-            error.message = `${error.message} Driver profile rollback failed: ${rollbackError.message}`
-          }
-          throw error
-        }
-      },
-      (result) => `${result.user.name} can now sign in as Driver.`
-    )
-
-    if (saved) setDriverAccountForm(initialDriverAccountForm)
-  }
-
-  async function handleCreateCustomerAccount(event) {
-    event.preventDefault()
-    if (missingFields(customerAccountForm, ['email', 'name', 'password'])) {
-      setAction({ busy: '', message: 'Fill customer name, email, and password.', tone: 'warning' })
-      return
-    }
-
-    const saved = await runAction(
-      'customer-account-create',
-      async () => {
-        const customer = await createCustomer({
-          company: customerAccountForm.company || null,
-          email: customerAccountForm.email,
-          name: customerAccountForm.name,
-          phone: customerAccountForm.phone || null,
-        }, { token })
-
-        try {
-          return await createUser({
-            customerId: customer.customerId,
-            email: customerAccountForm.email,
-            id: customer.customerId,
-            name: customerAccountForm.name,
-            password: customerAccountForm.password,
-            role: 'customer',
-          }, { token })
-        } catch (error) {
-          try {
-            await deleteCustomer(customer.customerId, { token })
-          } catch (rollbackError) {
-            error.message = `${error.message} Customer record rollback failed: ${rollbackError.message}`
-          }
-          throw error
-        }
-      },
-      (result) => `${result.user.name} can now sign in as Customer.`
-    )
-
-    if (saved) setCustomerAccountForm(initialCustomerAccountForm)
-  }
-
-  async function handleCreateLogisticsAccount(event) {
-    event.preventDefault()
-    if (missingFields(logisticsAccountForm, ['customerId', 'email', 'name', 'password'])) {
-      setAction({ busy: '', message: 'Select customer and fill logistics manager name, email, and password.', tone: 'warning' })
-      return
-    }
-
-    const saved = await runAction(
-      'logistics-account-create',
-      () => createUser({
-        customerId: logisticsAccountForm.customerId,
-        email: logisticsAccountForm.email,
-        name: logisticsAccountForm.name,
-        password: logisticsAccountForm.password,
-        role: 'logistics',
-      }, { token }),
-      (result) => `${result.user.name} can now sign in as Logistics Manager.`
-    )
-
-    if (saved) {
-      setLogisticsAccountForm((current) => ({
-        ...initialLogisticsAccountForm,
-        customerId: current.customerId,
-      }))
-    }
-  }
-
   async function handleScanDelays() {
     await runAction(
       'scan-delays',
@@ -425,25 +277,6 @@ export function AdminLandingPage({ onNavigate, onSignOut, profile, token }) {
       () => updateDriverAvailability(driver.id, !driver.available, { token }),
       () => `${driver.name} is now ${driver.available ? 'unavailable' : 'available'}.`
     )
-  }
-
-  async function handleRecordMilestone(event) {
-    event.preventDefault()
-    if (!trackingForm.shipmentId) {
-      setAction({ busy: '', message: 'Select a shipment before recording a milestone.', tone: 'warning' })
-      return
-    }
-    const saved = await runAction(
-      'tracking',
-      () => createTrackingEvent(trackingForm.shipmentId, {
-        eventType: trackingForm.eventType,
-        idempotencyKey: `admin-${trackingForm.shipmentId}-${trackingForm.eventType}-${Date.now()}`,
-        notes: trackingForm.notes || undefined,
-        occurredAt: new Date().toISOString(),
-      }, { token }),
-      () => 'Tracking milestone recorded.'
-    )
-    if (saved) setTrackingForm((current) => ({ ...current, notes: '' }))
   }
 
   async function handleCreateTicket(event) {
@@ -542,174 +375,6 @@ export function AdminLandingPage({ onNavigate, onSignOut, profile, token }) {
           ))}
         </div>
       )}
-
-      {!state.loading && profile?.role === 'admin' ? (
-        <div className="panel-grid three">
-          <section className="form-panel">
-            <div className="panel-heading">
-              <div>
-                <span>Identity service</span>
-                <h2>Create driver login</h2>
-              </div>
-            </div>
-            <form className="stacked-form" onSubmit={handleCreateDriverAccount}>
-              <label className="field">
-                <span>Name</span>
-                <input
-                  onChange={(event) => setDriverAccountForm((current) => ({ ...current, name: event.target.value }))}
-                  required
-                  value={driverAccountForm.name}
-                />
-              </label>
-              <label className="field">
-                <span>Email</span>
-                <input
-                  onChange={(event) => setDriverAccountForm((current) => ({ ...current, email: event.target.value }))}
-                  required
-                  type="email"
-                  value={driverAccountForm.email}
-                />
-              </label>
-              <label className="field">
-                <span>Phone</span>
-                <input
-                  onChange={(event) => setDriverAccountForm((current) => ({ ...current, phone: event.target.value }))}
-                  required
-                  type="tel"
-                  value={driverAccountForm.phone}
-                />
-              </label>
-              <label className="field">
-                <span>Password</span>
-                <input
-                  onChange={(event) => setDriverAccountForm((current) => ({ ...current, password: event.target.value }))}
-                  required
-                  type="password"
-                  value={driverAccountForm.password}
-                />
-              </label>
-              <button className="button-primary" disabled={action.busy === 'driver-account-create'} type="submit">
-                {action.busy === 'driver-account-create' ? 'Creating' : 'Create driver'}
-              </button>
-            </form>
-          </section>
-
-          <section className="form-panel">
-            <div className="panel-heading">
-              <div>
-                <span>Customer service</span>
-                <h2>Create customer login</h2>
-              </div>
-            </div>
-            <form className="stacked-form" onSubmit={handleCreateCustomerAccount}>
-              <label className="field">
-                <span>Name</span>
-                <input
-                  onChange={(event) => setCustomerAccountForm((current) => ({ ...current, name: event.target.value }))}
-                  required
-                  value={customerAccountForm.name}
-                />
-              </label>
-              <label className="field">
-                <span>Company</span>
-                <input
-                  onChange={(event) => setCustomerAccountForm((current) => ({ ...current, company: event.target.value }))}
-                  value={customerAccountForm.company}
-                />
-              </label>
-              <label className="field">
-                <span>Email</span>
-                <input
-                  onChange={(event) => setCustomerAccountForm((current) => ({ ...current, email: event.target.value }))}
-                  required
-                  type="email"
-                  value={customerAccountForm.email}
-                />
-              </label>
-              <label className="field">
-                <span>Phone</span>
-                <input
-                  onChange={(event) => setCustomerAccountForm((current) => ({ ...current, phone: event.target.value }))}
-                  type="tel"
-                  value={customerAccountForm.phone}
-                />
-              </label>
-              <label className="field">
-                <span>Password</span>
-                <input
-                  onChange={(event) => setCustomerAccountForm((current) => ({ ...current, password: event.target.value }))}
-                  required
-                  type="password"
-                  value={customerAccountForm.password}
-                />
-              </label>
-              <button className="button-primary" disabled={action.busy === 'customer-account-create'} type="submit">
-                {action.busy === 'customer-account-create' ? 'Creating' : 'Create customer'}
-              </button>
-            </form>
-          </section>
-
-          <section className="form-panel">
-            <div className="panel-heading">
-              <div>
-                <span>Customer account</span>
-                <h2>Create logistics manager</h2>
-              </div>
-            </div>
-            <form className="stacked-form" onSubmit={handleCreateLogisticsAccount}>
-              <label className="field">
-                <span>Customer</span>
-                <select
-                  disabled={state.customers.length === 0}
-                  onChange={(event) => setLogisticsAccountForm((current) => ({ ...current, customerId: event.target.value }))}
-                  required
-                  value={logisticsAccountForm.customerId}
-                >
-                  <option value="">Select customer</option>
-                  {state.customers.map((customer) => (
-                    <option key={customer.customerId} value={customer.customerId}>
-                      {customer.company || customer.name || customer.customerId}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="field">
-                <span>Name</span>
-                <input
-                  onChange={(event) => setLogisticsAccountForm((current) => ({ ...current, name: event.target.value }))}
-                  required
-                  value={logisticsAccountForm.name}
-                />
-              </label>
-              <label className="field">
-                <span>Email</span>
-                <input
-                  onChange={(event) => setLogisticsAccountForm((current) => ({ ...current, email: event.target.value }))}
-                  required
-                  type="email"
-                  value={logisticsAccountForm.email}
-                />
-              </label>
-              <label className="field">
-                <span>Password</span>
-                <input
-                  onChange={(event) => setLogisticsAccountForm((current) => ({ ...current, password: event.target.value }))}
-                  required
-                  type="password"
-                  value={logisticsAccountForm.password}
-                />
-              </label>
-              <button
-                className="button-primary"
-                disabled={action.busy === 'logistics-account-create' || state.customers.length === 0}
-                type="submit"
-              >
-                {action.busy === 'logistics-account-create' ? 'Creating' : 'Create manager'}
-              </button>
-            </form>
-          </section>
-        </div>
-      ) : null}
 
       {/* Live workboard + side rail */}
       {!state.loading && (
@@ -859,56 +524,9 @@ export function AdminLandingPage({ onNavigate, onSignOut, profile, token }) {
         </div>
       )}
 
-      {/* Operational tools: 2x2 grid */}
+      {/* Operational tools: grid */}
       {!state.loading && (
         <div className="panel-grid equal">
-          {/* Record tracking milestone */}
-          <section className="form-panel">
-            <div className="panel-heading">
-              <div>
-                <span>Tracking service</span>
-                <h2>Record milestone</h2>
-              </div>
-            </div>
-            <form className="stacked-form" onSubmit={handleRecordMilestone}>
-              <label className="field">
-                <span>Shipment</span>
-                <select
-                  onChange={(event) => setTrackingForm((current) => ({ ...current, shipmentId: event.target.value }))}
-                  value={trackingForm.shipmentId}
-                >
-                  {state.shipments.map((s) => (
-                    <option key={s._id} value={s._id}>
-                      {shipmentLabel(s._id)} / {formatStatus(s.status)}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="field">
-                <span>Milestone</span>
-                <select
-                  onChange={(event) => setTrackingForm((current) => ({ ...current, eventType: event.target.value }))}
-                  value={trackingForm.eventType}
-                >
-                  {TRACKING_MILESTONES.map((m) => (
-                    <option key={m.value} value={m.value}>{m.label}</option>
-                  ))}
-                </select>
-              </label>
-              <label className="field">
-                <span>Notes</span>
-                <textarea
-                  onChange={(event) => setTrackingForm((current) => ({ ...current, notes: event.target.value }))}
-                  placeholder="Operational note for this event"
-                  value={trackingForm.notes}
-                />
-              </label>
-              <button className="button-primary" disabled={action.busy === 'tracking'} type="submit">
-                {action.busy === 'tracking' ? 'Recording' : 'Record milestone'}
-              </button>
-            </form>
-          </section>
-
           {/* Create support escalation */}
           <section className="form-panel">
             <div className="panel-heading">
