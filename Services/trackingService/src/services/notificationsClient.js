@@ -30,6 +30,7 @@ function delayPayloadFromEvent(event) {
     driverId: event.driverId,
     notes: event.notes,
     occurredAt: event.occurredAt,
+    receiverCustomerId: event.receiverCustomerId,
     shipmentId: event.shipmentId,
     trackingEventId: event.trackingEventId,
   }
@@ -66,6 +67,7 @@ async function postNotification(path, payload) {
   return {
     status: 'succeeded',
     created: result.created || 0,
+    ...(result.targetedCustomer === undefined ? {} : { targetedCustomer: result.targetedCustomer || null }),
     targetedRoles: result.targetedRoles || [],
   }
 }

@@ -34,7 +34,7 @@ describe('notifications client', () => {
   it('posts driver delay events to notification-service with service auth', async () => {
     global.fetch.mockResolvedValue({
       ok: true,
-      json: async () => ({ created: 2, targetedRoles: ['admin', 'support'] }),
+      json: async () => ({ created: 3, targetedCustomer: 'customer-1', targetedRoles: ['admin', 'support'] }),
     })
     const { dispatchDriverDelayNotification } = require('../services/notificationsClient')
 
@@ -43,6 +43,7 @@ describe('notifications client', () => {
       eventType: 'delay_logged',
       notes: 'Border queue',
       occurredAt: '2026-05-11T13:00:00.000Z',
+      receiverCustomerId: 'customer-1',
       shipmentId: 'shipment-1',
       trackingEventId: 'event-1',
     })
@@ -61,12 +62,14 @@ describe('notifications client', () => {
       driverId: 'driver-1',
       notes: 'Border queue',
       occurredAt: '2026-05-11T13:00:00.000Z',
+      receiverCustomerId: 'customer-1',
       shipmentId: 'shipment-1',
       trackingEventId: 'event-1',
     })
     expect(result).toEqual({
       status: 'succeeded',
-      created: 2,
+      created: 3,
+      targetedCustomer: 'customer-1',
       targetedRoles: ['admin', 'support'],
     })
   })

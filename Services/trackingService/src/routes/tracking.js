@@ -85,14 +85,21 @@ router.post('/events', requireWriteAuth, async (req, res) => {
     const shipmentNumber = shipmentReference(req)
     await verifyShipmentExists(shipmentNumber)
 
+    let shipmentContext
+    async function loadShipmentContext() {
+      if (shipmentContext !== undefined) return shipmentContext
+      try {
+        shipmentContext = await getShipment(shipmentNumber)
+      } catch {
+        shipmentContext = null
+      }
+      return shipmentContext
+    }
+
     let routeId = req.body.routeId || null
     if (!routeId) {
-      try {
-        const shipment = await getShipment(shipmentNumber)
-        routeId = shipment.routeId || null
-      } catch {
-        // best-effort — proceed without routeId if lookup fails
-      }
+      const shipment = await loadShipmentContext()
+      routeId = shipment?.routeId || null
     }
 
     const input = TrackingEvent.buildEventInput(shipmentNumber, { ...req.body, routeId })
@@ -109,9 +116,15 @@ router.post('/events', requireWriteAuth, async (req, res) => {
       : isPlanned
         ? { status: 'skipped', reason: 'planned event is not published to broker' }
         : await publishTrackingEvent(event)
-    const driverDelayNotification = duplicate || isPlanned
-      ? { status: 'skipped', reason: isPlanned ? 'planned event' : 'duplicate idempotencyKey' }
-      : await dispatchDriverDelayNotification(event)
+    let driverDelayNotification
+    if (duplicate || isPlanned) {
+      driverDelayNotification = { status: 'skipped', reason: isPlanned ? 'planned event' : 'duplicate idempotencyKey' }
+    } else {
+      const notificationEvent = input.eventType === 'delay_logged'
+        ? { ...event, receiverCustomerId: (await loadShipmentContext())?.receiverCustomerId }
+        : event
+      driverDelayNotification = await dispatchDriverDelayNotification(notificationEvent)
+    }
     const driverDeliveryNotification = duplicate || isPlanned
       ? { status: 'skipped', reason: isPlanned ? 'planned event' : 'duplicate idempotencyKey' }
       : await dispatchDriverDeliveryNotification(event)
