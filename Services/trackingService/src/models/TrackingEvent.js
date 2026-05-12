@@ -613,6 +613,7 @@ async function summaryForShipment(shipmentId) {
           occurredAt: latestEvent.occurredAt,
         }
       : null,
+    latestMilestoneEventType: latestLifecycleEvent ? latestLifecycleEvent.canonicalEventType : null,
     eventCount,
   }
 }

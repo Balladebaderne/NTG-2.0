@@ -60,6 +60,14 @@ _Avoid_: Reward points, credits, score
 A Shipment status change that is not the final delivery (i.e. not `received`), used as a trigger for awarding a smaller number of LoyaltyPoints to the assigned Driver. Originates from the trackingService via the message broker.
 _Avoid_: Status update, tracking event, partial event
 
+**MilestoneEvent**:
+A TrackingEvent that advances the Shipment lifecycle flow. Each MilestoneEvent has a defined position in the progression (e.g. "Goods loaded and pickup confirmed", "Goods delivered"). Only MilestoneEvents are used to determine which Driver actions are available next.
+_Avoid_: Flow event, lifecycle event, status event
+
+**SideEvent**:
+A TrackingEvent that annotates a Shipment without advancing the milestone flow (e.g. `delay_logged`, `exception_logged`). A SideEvent does not change which next MilestoneEvent is expected.
+_Avoid_: Non-flow event, annotation event, status update
+
 **StopConfirmation**:
 A driver-reported fact that a planned Route Stop has been physically reached, recording the actual arrival time.
 _Avoid_: GPS update, live location ping, tracking event (that term belongs to trackingService)

@@ -171,8 +171,7 @@ function DriverQuickActions({ initialShipmentId, onSaved, profile, shipments, to
     try {
       const action = QUICK_ACTIONS.find((item) => item.eventType === eventType)
       const tracking = trackingByShipmentId?.get(selectedId)
-      const latestEventType = tracking?.latestEvent?.eventType
-      const currentOrder = EVENT_ORDER[latestEventType] || 0
+      const currentOrder = EVENT_ORDER[tracking?.latestMilestoneEventType] || 0
       const targetOrder = EVENT_ORDER[eventType] || 0
 
       if (targetOrder > 0) {
@@ -208,7 +207,7 @@ function DriverQuickActions({ initialShipmentId, onSaved, profile, shipments, to
   }
 
   const tracking = trackingByShipmentId?.get(selectedId)
-  const currentOrder = EVENT_ORDER[tracking?.latestEvent?.eventType] || 0
+  const currentOrder = EVENT_ORDER[tracking?.latestMilestoneEventType] || 0
   const isCompleted = currentOrder >= 120
 
   const validActions = QUICK_ACTIONS.filter((action) => {
