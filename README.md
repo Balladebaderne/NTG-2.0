@@ -11,7 +11,7 @@ NTG is a freight and parcel logistics platform that coordinates the movement of 
 | `Services/` | Backend microservices (each with its own database) |
 | `messageBroker/` | Node.js/Express RabbitMQ wrapper service |
 
-![image](docs\Arkitektur.jpg)
+![Architecture](docs/Arkitektur.jpg)
 
 ### Architecture Decision Records
 A record of architecture decisions can be found in the [adr]
