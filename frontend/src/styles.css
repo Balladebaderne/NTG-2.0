@@ -2436,6 +2436,15 @@ button.driver-unavailable-pill {
   opacity: 0.7;
 }
 
+.driver-action-sublabel {
+  display: block;
+  font-size: 0.75rem;
+  opacity: 0.75;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-top: 2px;
+}
+
 .driver-tone-blue {
   background: var(--color-accent-blue-soft);
   border-color: rgba(62, 154, 215, 0.2);
@@ -2589,6 +2598,56 @@ button.driver-unavailable-pill {
 .driver-result-err {
   background: var(--color-accent-red-soft);
   color: var(--color-accent-red-dark);
+}
+
+/* Planned stop confirmation cards */
+.driver-planned-stops {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 0 20px 16px;
+}
+
+.driver-planned-stop {
+  align-items: center;
+  background: var(--color-section-bg);
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-medium);
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  padding: 14px 16px;
+}
+
+.driver-planned-stop-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.driver-planned-stop-info strong {
+  color: var(--color-primary-navy);
+  font-size: 0.95rem;
+}
+
+.driver-planned-stop-notes {
+  color: var(--color-text-muted);
+  font-size: 0.82rem;
+}
+
+.driver-stop-confirmed {
+  color: var(--color-accent-green, #3a6808);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+/* Planned timeline items (greyed out) */
+.timeline li.is-planned {
+  opacity: 0.6;
+}
+
+.timeline li.is-planned strong {
+  font-style: italic;
 }
 
 .driver-card-list {

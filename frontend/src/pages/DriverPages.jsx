@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react'
 import { getDriver, updateDriverAvailability } from '../clients/driversClient'
 import { getDriverPoints } from '../clients/loyaltyClient'
 import { listShipments } from '../clients/shipmentsClient'
-import { createTrackingEvent, getLatestTracking } from '../clients/trackingClient'
+import { createTrackingEvent, getLatestTracking, getTrackingEvents } from '../clients/trackingClient'
 import {
   AppShell,
   EmptyState,
@@ -29,7 +29,6 @@ function driverIdFor(profile) {
 const QUICK_ACTIONS = [
   { eventType: 'goods_loaded_pickup_confirmed', label: 'Pickup confirmed', tone: 'blue', order: 50 },
   { eventType: 'departed_origin_terminal', label: 'Departed terminal', tone: 'blue', order: 70 },
-  { eventType: 'in_transit_milestone', label: 'Border crossed', tone: 'blue', order: 80, repeatable: true },
   { eventType: 'arrived_destination_terminal', label: 'Arrived terminal', tone: 'blue', order: 90 },
   { eventType: 'goods_delivered', label: 'Delivered', tone: 'green', order: 120 },
   { eventType: 'delay_logged', label: 'Delay', tone: 'warning', sideEvent: true },
@@ -142,7 +141,7 @@ function useDriverData({ profile, token }) {
   return { ...state, loadDriverData }
 }
 
-function DriverQuickActions({ initialShipmentId, onSaved, profile, shipments, token, trackingByShipmentId }) {
+function DriverQuickActions({ initialShipmentId, onSaved, plannedStops = [], profile, shipments, token, trackingByShipmentId }) {
   const [selectedId, setSelectedId] = useState(initialShipmentId || shipments[0]?._id || '')
   const [busy, setBusy] = useState(null)
   const [result, setResult] = useState(null)
@@ -161,6 +160,50 @@ function DriverQuickActions({ initialShipmentId, onSaved, profile, shipments, to
       occurredAt: new Date().toISOString(),
       ...extraFields,
     }, { token })
+  }
+
+  async function handlePlannedStop(stop) {
+    if (!selectedId || busy) return
+    const busyKey = `planned-${stop.trackingEventId}`
+    setBusy(busyKey)
+    setResult(null)
+
+    try {
+      const tracking = trackingByShipmentId?.get(selectedId)
+      const currentOrder = EVENT_ORDER[tracking?.latestMilestoneEventType] || 0
+      const targetOrder = EVENT_ORDER.in_transit_milestone || 80
+
+      const prereqsNeeded = REQUIRED_FLOW.filter(
+        (req) => req.order < targetOrder && req.order > currentOrder
+      )
+      for (const prereq of prereqsNeeded) {
+        await submitEvent(selectedId, prereq.eventType)
+      }
+
+      await createTrackingEvent(selectedId, {
+        eventType: 'in_transit_milestone',
+        driverId: driverIdFor(profile),
+        location: stop.location || undefined,
+        notes: stop.notes || undefined,
+        idempotencyKey: `driver-confirm-planned-${stop.trackingEventId}`,
+        occurredAt: new Date().toISOString(),
+        metadata: { confirmsPlannedEventId: stop.trackingEventId, stopType: stop.metadata?.stopType },
+      }, { token })
+
+      setResult({
+        eventType: 'in_transit_milestone',
+        feedback: {
+          ...feedbackForAction('in_transit_milestone'),
+          title: `Arrived at ${stop.location?.label || 'stop'}`,
+        },
+        ok: true,
+      })
+      onSaved?.({ silent: true })
+    } catch (err) {
+      setResult({ ok: false, message: err.message })
+    } finally {
+      setBusy(null)
+    }
   }
 
   async function handleAction(eventType) {
@@ -216,6 +259,13 @@ function DriverQuickActions({ initialShipmentId, onSaved, profile, shipments, to
     return action.order > currentOrder
   })
 
+  // Merge planned stops (order 80) into the action list so they appear between
+  // "Departed terminal" (70) and "Arrived terminal" (90).
+  const mergedGrid = [
+    ...validActions.map((a) => ({ kind: 'regular', order: a.order ?? 999, action: a })),
+    ...plannedStops.map((stop) => ({ kind: 'planned', order: 80, stop })),
+  ].sort((a, b) => a.order - b.order)
+
   return (
     <div className="driver-quick-actions">
       {shipments.length > 1 && (
@@ -235,18 +285,40 @@ function DriverQuickActions({ initialShipmentId, onSaved, profile, shipments, to
         <div className="driver-result driver-result-ok">Shipment is completed and delivered.</div>
       ) : (
         <div className="driver-action-grid">
-          {validActions.map((action) => (
-            <button
-              key={action.eventType}
-              className={`driver-action-btn driver-tone-${action.tone}`}
-              disabled={!!busy || !selectedId}
-              onClick={() => handleAction(action.eventType)}
-              type="button"
-            >
-              <span className="driver-action-label">{action.label}</span>
-              {busy === action.eventType && <span className="driver-action-busy">Saving</span>}
-            </button>
-          ))}
+          {mergedGrid.map((item) => {
+            if (item.kind === 'planned') {
+              const { stop } = item
+              const busyKey = `planned-${stop.trackingEventId}`
+              return (
+                <button
+                  key={stop.trackingEventId}
+                  className="driver-action-btn driver-tone-blue"
+                  disabled={!!busy || !selectedId}
+                  onClick={() => handlePlannedStop(stop)}
+                  type="button"
+                >
+                  <span className="driver-action-label">
+                    {stop.location?.label || 'Intermediate stop'}
+                  </span>
+                  <span className="driver-action-sublabel">Confirm arrival</span>
+                  {busy === busyKey && <span className="driver-action-busy">Saving</span>}
+                </button>
+              )
+            }
+            const { action } = item
+            return (
+              <button
+                key={action.eventType}
+                className={`driver-action-btn driver-tone-${action.tone}`}
+                disabled={!!busy || !selectedId}
+                onClick={() => handleAction(action.eventType)}
+                type="button"
+              >
+                <span className="driver-action-label">{action.label}</span>
+                {busy === action.eventType && <span className="driver-action-busy">Saving</span>}
+              </button>
+            )
+          })}
         </div>
       )}
 
@@ -307,6 +379,7 @@ function DriverActionFeedback({ result }) {
     </div>
   )
 }
+
 
 function DriverAvailabilityToggle({ profile, token }) {
   const [available, setAvailable] = useState(null)
@@ -519,6 +592,42 @@ export function DriverShipmentUpdatePage({ onNavigate, onSignOut, profile, shipm
     [state.trackingSummaries]
   )
 
+  const [events, setEvents] = useState([])
+  const [eventsLoading, setEventsLoading] = useState(true)
+
+  async function loadEvents() {
+    setEventsLoading(true)
+    try {
+      const result = await getTrackingEvents(shipmentId, { token })
+      setEvents(asArray(result))
+    } catch {
+      setEvents([])
+    } finally {
+      setEventsLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    loadEvents()
+  }, [shipmentId, token])
+
+  function handleSaved(opts) {
+    state.loadDriverData(opts)
+    loadEvents()
+  }
+
+  const plannedStops = events.filter((e) => e.isPlanned)
+
+  // Only show planned stops that have no matching confirmed milestone at the same location.
+  const confirmedMilestoneLabels = new Set(
+    events
+      .filter((e) => !e.isPlanned && e.eventType === 'in_transit_milestone' && e.location?.label)
+      .map((e) => e.location.label)
+  )
+  const pendingPlannedStops = plannedStops.filter(
+    (e) => !confirmedMilestoneLabels.has(e.location?.label)
+  )
+
   return (
     <AppShell active="driver-assigned" onNavigate={onNavigate} onSignOut={onSignOut} profile={profile} token={token}>
       <section className="workspace-hero">
@@ -534,22 +643,27 @@ export function DriverShipmentUpdatePage({ onNavigate, onSignOut, profile, shipm
         <EmptyState message="This shipment is not assigned to your driver profile." />
       )}
       {!state.loading && shipment && (
-        <section className="driver-main-panel">
-          <div className="panel-heading">
-            <div>
-              <span>Register event</span>
-              <h2>What happened?</h2>
+        <>
+          <section className="driver-main-panel">
+            <div className="panel-heading">
+              <div>
+                <span>Register event</span>
+                <h2>What happened?</h2>
+              </div>
             </div>
-          </div>
-          <DriverQuickActions
-            initialShipmentId={shipmentId}
-            onSaved={state.loadDriverData}
-            profile={profile}
-            shipments={state.shipments}
-            token={token}
-            trackingByShipmentId={trackingByShipmentId}
-          />
-        </section>
+            {eventsLoading ? <LoadingGrid count={1} /> : (
+              <DriverQuickActions
+                initialShipmentId={shipmentId}
+                onSaved={handleSaved}
+                plannedStops={pendingPlannedStops}
+                profile={profile}
+                shipments={state.shipments}
+                token={token}
+                trackingByShipmentId={trackingByShipmentId}
+              />
+            )}
+          </section>
+        </>
       )}
     </AppShell>
   )

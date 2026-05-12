@@ -166,29 +166,18 @@ export function ShipmentDetailPage({
                   </div>
                 </div>
                 <RouteMap route={route} />
-                <ul className="split-list" style={{ marginTop: '1rem' }}>
-                  {asArray(route.stops).map((stop) => (
-                    <li key={stop.stopId}>
-                      <div>
-                        <strong>{formatStatus(stop.type)}</strong>
-                        <small>{[stop.address?.city, stop.address?.country].filter(Boolean).join(', ')}</small>
-                      </div>
-                      {stop.actualArrivalAt
-                        ? <span style={{ color: '#16a34a' }}>✓ {formatDateTime(stop.actualArrivalAt)}</span>
-                        : <span style={{ color: '#9ca3af' }}>Planned {formatDateTime(stop.plannedArrivalAt) || '—'}</span>}
-                    </li>
-                  ))}
-                </ul>
               </>
             ) : (
               <EmptyState compact message="No route plan is linked yet." title="No route" />
             )}
           </section>
 
-          <section className="panel">
-            <SectionHeader eyebrow={`${history.length} events`} title="Tracking timeline" />
-            <Timeline events={history} />
-          </section>
+          {profile?.role !== 'driver' && (
+            <section className="panel">
+              <SectionHeader eyebrow={`${history.length} events`} title="Live tracking" />
+              <Timeline events={history} />
+            </section>
+          )}
 
           <div className="panel-grid equal">
             <section className="panel">

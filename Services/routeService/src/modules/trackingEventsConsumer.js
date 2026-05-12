@@ -3,19 +3,35 @@ const amqp = require('amqplib')
 const config = require('../config')
 const RoutePlan = require('../models/RoutePlan')
 
+// Maps a published trackingEventType to the stop type(s) it confirms.
+// In_transit_milestone can match multiple types — the first unconfirmed one in sequence is chosen.
+const STOP_TYPES_BY_EVENT_TYPE = {
+  goods_loaded_pickup_confirmed: ['pickup'],
+  departed_origin_terminal: ['origin_terminal'],
+  in_transit_milestone: ['hub', 'border_crossing'],
+  arrived_destination_terminal: ['destination_terminal'],
+  goods_delivered: ['delivery'],
+  pod_confirmed: ['delivery'],
+  shipment_completed_closed: ['delivery'],
+}
+
 async function handleTrackingEvent(event, routingKey) {
   const routeId = event.routeId
-  const stopId = event.metadata && event.metadata.stopId
-
-  if (!routeId || !stopId) {
-    return { status: 'skipped', reason: 'missing routeId or metadata.stopId' }
+  if (!routeId) {
+    return { status: 'skipped', reason: 'missing routeId' }
   }
 
-  const confirmedAt = event.reportedAt || event.occurredAt || new Date().toISOString()
-  const result = await RoutePlan.confirmStop(routeId, stopId, confirmedAt)
+  const eventType = event.trackingEventType || event.type
+  const stopTypes = STOP_TYPES_BY_EVENT_TYPE[eventType]
+  if (!stopTypes) {
+    return { status: 'skipped', reason: `no stop mapping for event type "${eventType}"` }
+  }
+
+  const confirmedAt = event.occurredAt || event.reportedAt || new Date().toISOString()
+  const result = await RoutePlan.confirmNextStopByType(routeId, stopTypes, confirmedAt)
 
   if (!result) {
-    return { status: 'skipped', reason: 'route or stop not found' }
+    return { status: 'skipped', reason: 'no matching unconfirmed stop found' }
   }
 
   return { status: 'processed', routeId: result.routeId, newStatus: result.status }

@@ -4,6 +4,7 @@ const { requireWriteAuth } = require('../middleware/requireWriteAuth')
 const RoutePlan = require('../models/RoutePlan')
 const { enrichRouteInput } = require('../modules/routeCalculation')
 const { syncShipmentRoute, verifyShipmentExists } = require('../modules/shipmentsClient')
+const { postPlannedStops } = require('../modules/trackingClient')
 
 const router = express.Router()
 
@@ -66,6 +67,12 @@ router.post('/', requireWriteAuth, async (req, res) => {
     const enrichedInput = await enrichRouteInput(input)
     const route = await RoutePlan.create(enrichedInput)
     const shipmentRouteSync = await syncShipmentRoute(enrichedInput.shipmentId, routeSyncPayload(route))
+
+    // Best-effort: post planned intermediate stops to trackingService so the
+    // driver sees hub/border_crossing stops in their event timeline.
+    postPlannedStops(enrichedInput.shipmentId, route.stops, { routeId: route.routeId })
+      .then((r) => console.log('[routes] Planned stops posted to tracking:', r))
+      .catch((err) => console.error('[routes] Could not post planned stops:', err.message))
 
     res.status(201).json({ route, shipmentRouteSync })
   } catch (err) {

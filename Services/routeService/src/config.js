@@ -6,6 +6,8 @@ function envBool(name, defaultValue) {
 
 module.exports = {
   shipmentsServiceUrl: (process.env.SHIPMENTS_SERVICE_URL || 'http://shipments-service:5000').replace(/\/$/, ''),
+  trackingServiceUrl: (process.env.TRACKING_SERVICE_URL || 'http://tracking-service:5000').replace(/\/$/, ''),
+  trackingServiceToken: process.env.SERVICE_AUTH_TOKEN || 'local-service-token-change-me',
   verifyShipments: envBool('VERIFY_SHIPMENTS', true),
   shipmentRouteSyncEnabled: envBool('SHIPMENT_ROUTE_SYNC_ENABLED', true),
   routeCalculationProvider: (process.env.ROUTE_CALCULATION_PROVIDER || 'google').trim().toLowerCase(),

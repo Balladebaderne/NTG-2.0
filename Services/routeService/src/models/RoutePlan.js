@@ -529,6 +529,27 @@ async function update(routeId, input) {
   }
 }
 
+async function confirmNextStopByType(routeId, stopTypes, confirmedAt) {
+  const result = await pool.query(
+    `
+      SELECT stop_id
+      FROM route_stops
+      WHERE route_id = $1
+        AND type = ANY($2)
+        AND actual_arrival_at IS NULL
+      ORDER BY sequence ASC
+      LIMIT 1
+    `,
+    [routeId, stopTypes]
+  )
+
+  const row = result.rows[0]
+  if (!row) return null
+
+  return confirmStop(routeId, row.stop_id, confirmedAt)
+}
+
+
 async function remove(routeId) {
   const result = await pool.query(
     `
@@ -614,6 +635,7 @@ module.exports = {
   VALID_ROUTE_STATUSES,
   VALID_STOP_TYPES,
   buildRouteInput,
+  confirmNextStopByType,
   confirmStop,
   create,
   findById,

@@ -202,6 +202,11 @@ services:
       - GOOGLE_MAPS_API_KEY=${GOOGLE_MAPS_API_KEY:-AIzaSyCfVQgCV8rQjV4EjnkevYoae4hFjyZ4SL0}
       - ROUTE_CALCULATION_PROVIDER=template
       - ROUTE_CALCULATION_REQUIRED=false
+      - TRACKING_CONSUMER_ENABLED=true
+      - TRACKING_EVENTS_EXCHANGE=tracking.events
+      - ROUTE_PROGRESS_QUEUE=route-service.tracking-events
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672
+      - TRACKING_SERVICE_URL=http://tracking-service:5000
       - AUTH_REQUIRED=true
       - JWT_SECRET=local-login-secret-change-me
       - SERVICE_AUTH_TOKEN=local-service-token-change-me
@@ -209,6 +214,10 @@ services:
       route_db:
         condition: service_healthy
       shipments-service:
+        condition: service_healthy
+      tracking-service:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
     networks:
       - web

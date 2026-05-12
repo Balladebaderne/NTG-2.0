@@ -555,17 +555,22 @@ export function Timeline({ events = [] }) {
 
   return (
     <ol className="timeline">
-      {rows.map((event, index) => (
-        <li className={String(event.eventType || '').includes('delay') || String(event.eventType || '').includes('exception') ? 'is-warning' : ''} key={event.trackingEventId || event.eventId || index}>
-          <div className="timeline-marker" aria-hidden="true" />
-          <div>
-            <strong>{event.eventLabel || formatStatus(event.eventType)}</strong>
-            <span>{formatDateTime(event.occurredAt || event.createdAt)}</span>
-            <p>{event.location?.label || event.locationName || 'Location not registered'}</p>
-            {event.notes ? <small>{event.notes}</small> : null}
-          </div>
-        </li>
-      ))}
+      {rows.map((event, index) => {
+        const isWarning = String(event.eventType || '').includes('delay') || String(event.eventType || '').includes('exception')
+        const isPlanned = Boolean(event.isPlanned)
+        const className = [isWarning ? 'is-warning' : '', isPlanned ? 'is-planned' : ''].filter(Boolean).join(' ')
+        return (
+          <li className={className || undefined} key={event.trackingEventId || event.eventId || index}>
+            <div className="timeline-marker" aria-hidden="true" />
+            <div>
+              <strong>{event.eventLabel || formatStatus(event.eventType)}</strong>
+              <span>{isPlanned ? `Planned ${formatDateTime(event.occurredAt || event.createdAt)}` : formatDateTime(event.occurredAt || event.createdAt)}</span>
+              <p>{event.location?.label || event.locationName || 'Location not registered'}</p>
+              {event.notes ? <small>{event.notes}</small> : null}
+            </div>
+          </li>
+        )
+      })}
     </ol>
   )
 }

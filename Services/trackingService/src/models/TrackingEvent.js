@@ -226,6 +226,8 @@ function normalizeEvent(row) {
         label: row.location_label,
       }
 
+  const metadata = row.metadata || null
+
   return {
     trackingEventId: row.tracking_event_id,
     shipmentId: row.shipment_id,
@@ -243,9 +245,11 @@ function normalizeEvent(row) {
     carrierId: row.carrier_id || null,
     podReference: row.pod_reference || null,
     notes: row.notes,
-    metadata: row.metadata || null,
+    metadata,
     idempotencyKey: row.idempotency_key,
     createdAt: row.created_at,
+    isPlanned: row.is_planned === true || row.is_planned === 1,
+    plannedArrivalAt: (metadata && metadata.plannedArrivalAt) || null,
   }
 }
 
@@ -292,7 +296,7 @@ function buildEventInput(shipmentId, body = {}) {
   const eventType = normalizeEventType(body.eventType)
   const definition = EVENT_DEFINITIONS[eventType]
 
-  if (body.status && !SHIPMENT_LIFECYCLE_STATUSES.includes(body.status)) {
+  if (!body.isPlanned && body.status && !SHIPMENT_LIFECYCLE_STATUSES.includes(body.status)) {
     throw badRequest('Invalid status', { allowed: SHIPMENT_LIFECYCLE_STATUSES })
   }
 
@@ -304,18 +308,24 @@ function buildEventInput(shipmentId, body = {}) {
     validateLocation(body.location)
   }
 
-  if (definition.shipmentStatus && body.status && body.status !== definition.shipmentStatus) {
+  if (!body.isPlanned && definition.shipmentStatus && body.status && body.status !== definition.shipmentStatus) {
     throw badRequest('Tracking event status contradicts lifecycle milestone', {
       eventType,
       expectedStatus: definition.shipmentStatus,
     })
   }
 
+  const isPlanned = body.isPlanned === true
+  const baseMetadata = validateMetadata(body.metadata) || {}
+  const metadata = isPlanned && body.plannedArrivalAt
+    ? { ...baseMetadata, plannedArrivalAt: body.plannedArrivalAt }
+    : (Object.keys(baseMetadata).length ? baseMetadata : null)
+
   return {
     trackingEventId: uuidv4(),
     shipmentId,
     eventType,
-    status: body.status || definition.shipmentStatus || null,
+    status: isPlanned ? null : (body.status || definition.shipmentStatus || null),
     occurredAt: parseOccurredAt(body.occurredAt),
     latitude: body.location ? body.location.lat : null,
     longitude: body.location ? body.location.lng : null,
@@ -325,8 +335,9 @@ function buildEventInput(shipmentId, body = {}) {
     carrierId: optionalString(body.carrierId),
     podReference: optionalString(body.podReference || body.podId),
     notes: optionalString(body.notes),
-    metadata: validateMetadata(body.metadata),
+    metadata,
     idempotencyKey: optionalString(body.idempotencyKey),
+    isPlanned,
   }
 }
 
@@ -409,6 +420,7 @@ async function listFlowEvents(shipmentId) {
       SELECT event_type
       FROM tracking_events
       WHERE shipment_id = $1
+        AND (is_planned IS NULL OR is_planned = FALSE)
     `,
     [shipmentId]
   )
@@ -441,7 +453,9 @@ async function create(input) {
   const existing = await findByIdempotencyKey(input.shipmentId, input.idempotencyKey)
   if (existing) return { event: existing, duplicate: true }
 
-  await validateShipmentFlow(input.shipmentId, input)
+  if (!input.isPlanned) {
+    await validateShipmentFlow(input.shipmentId, input)
+  }
 
   try {
     const result = await pool.query(
@@ -461,9 +475,10 @@ async function create(input) {
           pod_reference,
           notes,
           metadata,
-          idempotency_key
+          idempotency_key,
+          is_planned
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
         RETURNING *
       `,
       [
@@ -482,6 +497,7 @@ async function create(input) {
         input.notes,
         input.metadata === null ? null : JSON.stringify(input.metadata),
         input.idempotencyKey,
+        input.isPlanned === true,
       ]
     )
 

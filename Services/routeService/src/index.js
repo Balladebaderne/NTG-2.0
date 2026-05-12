@@ -7,10 +7,12 @@ const PORT = process.env.PORT || 5000
 ensureSchema()
   .then(() => {
     app.listen(PORT, () => console.log(`route-service listening on ${PORT}`))
-    return startTrackingEventsConsumer()
+    return startTrackingEventsConsumer().catch((err) => {
+      console.error('route-service: tracking consumer failed to start (non-fatal):', err.message)
+    })
   })
   .then((consumerResult) => {
-    if (consumerResult.status !== 'skipped') {
+    if (consumerResult && consumerResult.status !== 'skipped') {
       console.log('route-service: tracking consumer started', consumerResult)
     }
   })

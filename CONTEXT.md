@@ -69,7 +69,7 @@ A TrackingEvent that annotates a Shipment without advancing the milestone flow (
 _Avoid_: Non-flow event, annotation event, status update
 
 **StopConfirmation**:
-A driver-reported fact that a planned Route Stop has been physically reached, recording the actual arrival time.
+A driver-reported fact that a planned Route Stop has been physically reached, recording the actual arrival time. Triggered indirectly: the Driver logs a TrackingEvent; trackingService publishes it to the broker; routeService consumes it and maps the event type to the corresponding stop type to record the arrival.
 _Avoid_: GPS update, live location ping, tracking event (that term belongs to trackingService)
 
 **ETADelta**:

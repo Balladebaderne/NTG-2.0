@@ -109,6 +109,8 @@ async function ensureSchema() {
       ON tracking_events (shipment_id, idempotency_key)
       WHERE idempotency_key IS NOT NULL
   `)
+
+  await pool.query('ALTER TABLE tracking_events ADD COLUMN IF NOT EXISTS is_planned BOOLEAN NOT NULL DEFAULT FALSE')
 }
 
 module.exports = {
