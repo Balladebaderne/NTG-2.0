@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react'
 import { createUser } from '../clients/authClient'
 import { createCustomer, deleteCustomer, listCustomers } from '../clients/customersClient'
 import { createDriver, deleteDriver, listDrivers, updateDriverAvailability } from '../clients/driversClient'
+import { getDriverPoints } from '../clients/loyaltyClient'
 import { listNotifications, scanDelayNotifications } from '../clients/notificationsClient'
 import { createRoute, listRoutes } from '../clients/routesClient'
 import { listSenders } from '../clients/sendersClient'
@@ -32,6 +33,32 @@ function formatNumber(value) {
   return new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 }).format(value || 0)
 }
 
+function pointTotalFromPayload(payload) {
+  const points = Number(payload?.totalPoints ?? payload?.points ?? 0)
+  return Number.isFinite(points) ? points : 0
+}
+
+function compareDriversByPoints(first, second) {
+  const firstPoints = Number(first.loyaltyPoints || 0)
+  const secondPoints = Number(second.loyaltyPoints || 0)
+  const pointDifference = secondPoints - firstPoints
+
+  if (pointDifference !== 0) return pointDifference
+  return String(first.name || first.id).localeCompare(String(second.name || second.id))
+}
+
+function sortDriversByPoints(drivers) {
+  return [...drivers].sort(compareDriversByPoints)
+}
+
+function formatDriverAssignmentOption(driver) {
+  if (driver.loyaltyPointsLoaded === false) {
+    return `${driver.name} / points unavailable`
+  }
+
+  return `${driver.name} / ${formatNumber(driver.loyaltyPoints)} pts`
+}
+
 function initialCreateForm(profile) {
   return {
     description: 'General cargo',
@@ -51,6 +78,28 @@ function initialCreateForm(profile) {
     destinationPostalCode: '',
     destinationCountry: '',
   }
+}
+
+async function loadDriverPoints(drivers, token) {
+  if (drivers.length === 0) return drivers
+
+  const results = await Promise.all(
+    drivers.map((driver) => settle(`Driver points for ${driver.name || compactId(driver.id)}`, getDriverPoints(driver.id, { token })))
+  )
+
+  return drivers.map((driver, index) => {
+    const result = results[index]
+
+    if (!result.ok) {
+      return { ...driver, loyaltyPoints: 0, loyaltyPointsLoaded: false }
+    }
+
+    return {
+      ...driver,
+      loyaltyPoints: pointTotalFromPayload(result.value),
+      loyaltyPointsLoaded: true,
+    }
+  })
 }
 
 function useOperatorData({ token }) {
@@ -89,15 +138,18 @@ function useOperatorData({ token }) {
 
     const valueFor = (label) => results.find((result) => result.label === label)
     const shipments = asArray(valueFor('Shipments')?.value)
-    const trackingResults = await Promise.all(
-      shipments.slice(0, 10).map((shipment) => settle(`Tracking ${shipment._id}`, getLatestTracking(shipment._id, { token })))
-    )
+    const [driversWithPoints, trackingResults] = await Promise.all([
+      loadDriverPoints(asArray(valueFor('Drivers')?.value), token),
+      Promise.all(
+        shipments.slice(0, 10).map((shipment) => settle(`Tracking ${shipment._id}`, getLatestTracking(shipment._id, { token })))
+      ),
+    ])
 
     setState({
       customers: asArray(valueFor('Customers')?.value),
       delayed: asArray(valueFor('Delayed')?.value?.shipments),
       discrepancies: asArray(valueFor('Discrepancies')?.value?.discrepancies),
-      drivers: asArray(valueFor('Drivers')?.value),
+      drivers: driversWithPoints,
       errors: [...results, ...trackingResults]
         .filter((result) => !result.ok)
         .map((result) => `${result.label}: ${result.error.message}`),
@@ -204,17 +256,22 @@ function OperatorHero({ children, onRefresh, state, title }) {
 }
 
 function AssignmentPanel({ onAssigned, state, token }) {
-  const availableDrivers = state.drivers.filter((driver) => driver.available)
+  const availableDrivers = useMemo(
+    () => sortDriversByPoints(state.drivers.filter((driver) => driver.available)),
+    [state.drivers]
+  )
   const [form, setForm] = useState({ driverId: '', shipmentId: '' })
   const [message, setMessage] = useState('')
   const [busy, setBusy] = useState(false)
 
   useEffect(() => {
     setForm((current) => ({
-      driverId: current.driverId || availableDrivers[0]?.id || '',
+      driverId: availableDrivers.some((driver) => String(driver.id) === String(current.driverId))
+        ? current.driverId
+        : availableDrivers[0]?.id || '',
       shipmentId: current.shipmentId || state.shipments[0]?._id || '',
     }))
-  }, [state.drivers, state.shipments])
+  }, [availableDrivers, state.shipments])
 
   async function handleSubmit(event) {
     event.preventDefault()
@@ -253,7 +310,7 @@ function AssignmentPanel({ onAssigned, state, token }) {
         ) : (
           <select onChange={(event) => setForm((current) => ({ ...current, driverId: event.target.value }))} value={form.driverId}>
             {availableDrivers.map((driver) => (
-              <option key={driver.id} value={driver.id}>{driver.name}</option>
+              <option key={driver.id} value={driver.id}>{formatDriverAssignmentOption(driver)}</option>
             ))}
           </select>
         )}
@@ -270,6 +327,10 @@ function CreateShipmentForm({ onCreated, profile, state, token }) {
   const [form, setForm] = useState(initialCreateForm(profile))
   const [message, setMessage] = useState('')
   const [busy, setBusy] = useState(false)
+  const availableDrivers = useMemo(
+    () => sortDriversByPoints(state.drivers.filter((driver) => driver.available)),
+    [state.drivers]
+  )
 
   function updateField(key, value) {
     setForm((current) => ({ ...current, [key]: value }))
@@ -436,8 +497,8 @@ function CreateShipmentForm({ onCreated, profile, state, token }) {
           <span>Driver assignment</span>
           <select onChange={(event) => updateField('driverId', event.target.value)} value={form.driverId}>
             <option value="">Assign later</option>
-            {state.drivers.filter((driver) => driver.available).map((driver) => (
-              <option key={driver.id} value={driver.id}>{driver.name}</option>
+            {availableDrivers.map((driver) => (
+              <option key={driver.id} value={driver.id}>{formatDriverAssignmentOption(driver)}</option>
             ))}
           </select>
         </label>
