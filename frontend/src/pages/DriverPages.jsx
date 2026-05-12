@@ -289,6 +289,7 @@ function DriverQuickActions({ initialShipmentId, onSaved, plannedStops = [], pro
             if (item.kind === 'planned') {
               const { stop } = item
               const busyKey = `planned-${stop.trackingEventId}`
+              const stopPoints = ACTION_FEEDBACK.in_transit_milestone?.points
               return (
                 <button
                   key={stop.trackingEventId}
@@ -301,11 +302,13 @@ function DriverQuickActions({ initialShipmentId, onSaved, plannedStops = [], pro
                     {stop.location?.label || 'Intermediate stop'}
                   </span>
                   <span className="driver-action-sublabel">Confirm arrival</span>
+                  {stopPoints > 0 && <span className="driver-action-points">+{stopPoints} pts</span>}
                   {busy === busyKey && <span className="driver-action-busy">Saving</span>}
                 </button>
               )
             }
             const { action } = item
+            const actionPoints = ACTION_FEEDBACK[action.eventType]?.points
             return (
               <button
                 key={action.eventType}
@@ -315,6 +318,7 @@ function DriverQuickActions({ initialShipmentId, onSaved, plannedStops = [], pro
                 type="button"
               >
                 <span className="driver-action-label">{action.label}</span>
+                {actionPoints > 0 && <span className="driver-action-points">+{actionPoints} pts</span>}
                 {busy === action.eventType && <span className="driver-action-busy">Saving</span>}
               </button>
             )

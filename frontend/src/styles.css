@@ -2445,6 +2445,18 @@ button.driver-unavailable-pill {
   margin-top: 2px;
 }
 
+.driver-action-points {
+  background: rgba(255, 255, 255, 0.65);
+  border-radius: 20px;
+  color: #3a6808;
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  margin-top: 5px;
+  padding: 2px 7px;
+}
+
 .driver-tone-blue {
   background: var(--color-accent-blue-soft);
   border-color: rgba(62, 154, 215, 0.2);
