@@ -2,7 +2,11 @@ const express = require('express')
 
 const TrackingEvent = require('../models/TrackingEvent')
 const { requireWriteAuth } = require('../middleware/requireWriteAuth')
-const { syncShipmentStatus, verifyShipmentExists } = require('../services/shipmentsClient')
+const {
+  dispatchDriverDelayNotification,
+  dispatchDriverDeliveryNotification,
+} = require('../services/notificationsClient')
+const { syncShipmentStatus, verifyShipmentExists, getShipment } = require('../services/shipmentsClient')
 const { publishTrackingEvent } = require('../services/trackingEventsPublisher')
 
 const router = express.Router({ mergeParams: true })
@@ -81,16 +85,44 @@ router.post('/events', requireWriteAuth, async (req, res) => {
     const shipmentNumber = shipmentReference(req)
     await verifyShipmentExists(shipmentNumber)
 
-    const input = TrackingEvent.buildEventInput(shipmentNumber, req.body)
+    let routeId = req.body.routeId || null
+    if (!routeId) {
+      try {
+        const shipment = await getShipment(shipmentNumber)
+        routeId = shipment.routeId || null
+      } catch {
+        // best-effort — proceed without routeId if lookup fails
+      }
+    }
+
+    const input = TrackingEvent.buildEventInput(shipmentNumber, { ...req.body, routeId })
     const { event, duplicate } = await TrackingEvent.create(input)
+    const isPlanned = input.isPlanned === true
+
     const shipmentStatusSync = duplicate
       ? { status: 'skipped', reason: 'duplicate idempotencyKey' }
-      : await syncShipmentStatus(shipmentNumber, TrackingEvent.SYNC_STATUS_BY_EVENT[input.eventType])
+      : isPlanned
+        ? { status: 'skipped', reason: 'planned event does not change shipment status' }
+        : await syncShipmentStatus(shipmentNumber, TrackingEvent.SYNC_STATUS_BY_EVENT[input.eventType])
     const trackingEventPublish = duplicate
       ? { status: 'skipped', reason: 'duplicate idempotencyKey' }
-      : await publishTrackingEvent(event)
+      : isPlanned
+        ? { status: 'skipped', reason: 'planned event is not published to broker' }
+        : await publishTrackingEvent(event)
+    const driverDelayNotification = duplicate || isPlanned
+      ? { status: 'skipped', reason: isPlanned ? 'planned event' : 'duplicate idempotencyKey' }
+      : await dispatchDriverDelayNotification(event)
+    const driverDeliveryNotification = duplicate || isPlanned
+      ? { status: 'skipped', reason: isPlanned ? 'planned event' : 'duplicate idempotencyKey' }
+      : await dispatchDriverDeliveryNotification(event)
 
-    res.status(201).json({ event, shipmentStatusSync, trackingEventPublish })
+    res.status(201).json({
+      event,
+      shipmentStatusSync,
+      trackingEventPublish,
+      driverDelayNotification,
+      driverDeliveryNotification,
+    })
   } catch (err) {
     sendError(res, err)
   }

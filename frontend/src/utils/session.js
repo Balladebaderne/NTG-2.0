@@ -17,6 +17,7 @@ export function readSessionProfile(token) {
     const claims = JSON.parse(decodeBase64Url(payload))
 
     return {
+      customerId: claims.customerId || null,
       email: claims.email || '',
       id: claims.sub || '',
       name: claims.name || 'NTG user',

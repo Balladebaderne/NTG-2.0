@@ -30,7 +30,9 @@ async function verifyShipmentExists(shipmentId) {
   const encodedShipmentId = encodeURIComponent(shipmentId)
   let response
   try {
-    response = await fetchWithTimeout(`${shipmentsServiceUrl}/shipments/${encodedShipmentId}`)
+    response = await fetchWithTimeout(`${shipmentsServiceUrl}/shipments/${encodedShipmentId}`, {
+      headers: serviceHeaders(),
+    })
   } catch (err) {
     const unavailable = new Error(`shipmentsService unavailable: ${err.message}`)
     unavailable.status = 503
@@ -48,6 +50,34 @@ async function verifyShipmentExists(shipmentId) {
     failed.status = 502
     throw failed
   }
+}
+
+async function getShipment(shipmentId) {
+  const encodedShipmentId = encodeURIComponent(shipmentId)
+  let response
+  try {
+    response = await fetchWithTimeout(`${shipmentsServiceUrl}/shipments/${encodedShipmentId}`, {
+      headers: serviceHeaders(),
+    })
+  } catch (err) {
+    const unavailable = new Error(`shipmentsService unavailable: ${err.message}`)
+    unavailable.status = 503
+    throw unavailable
+  }
+
+  if (response.status === 404) {
+    const notFound = new Error('Shipment not found')
+    notFound.status = 404
+    throw notFound
+  }
+
+  if (!response.ok) {
+    const failed = new Error(`shipmentsService rejected lookup with ${response.status}`)
+    failed.status = 502
+    throw failed
+  }
+
+  return response.json()
 }
 
 async function syncShipmentStatus(shipmentId, shipmentStatus) {
@@ -95,6 +125,7 @@ async function syncShipmentStatus(shipmentId, shipmentStatus) {
 }
 
 module.exports = {
+  getShipment,
   verifyShipmentExists,
   syncShipmentStatus,
 }

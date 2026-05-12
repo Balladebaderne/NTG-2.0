@@ -2,7 +2,7 @@ const {
   buildGoogleRoutesRequest,
   normalizeGoogleRouteResponse,
   parseDurationSeconds,
-} = require('../services/googleRoutesClient')
+} = require('../modules/googleRoutesClient')
 
 const routeInput = {
   origin: {

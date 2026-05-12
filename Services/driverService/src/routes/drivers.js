@@ -1,7 +1,10 @@
 const express = require('express')
 const router = express.Router()
 const pool = require('../db')
-const { requireWriteAuth } = require('../middleware/requireWriteAuth')
+const {
+  requireAvailabilityWriteAuth,
+  requireOperatorWriteAuth,
+} = require('../middleware/requireWriteAuth')
 
 // GET /drivers — list all, optionally filter by availability
 router.get('/', async (req, res) => {
@@ -31,7 +34,7 @@ router.get('/:id', async (req, res) => {
 })
 
 // POST /drivers — register a new driver
-router.post('/', async (req, res) => {
+router.post('/', requireOperatorWriteAuth, async (req, res) => {
   const { name, email, phone } = req.body
   if (!name || !email || !phone) {
     return res.status(400).json({ error: 'name, email, and phone are required' })
@@ -51,7 +54,7 @@ router.post('/', async (req, res) => {
 })
 
 // PUT /drivers/:id — update driver profile (name, email, phone)
-router.put('/:id', async (req, res) => {
+router.put('/:id', requireOperatorWriteAuth, async (req, res) => {
   const { name, email, phone } = req.body
   if (!name || !email || !phone) {
     return res.status(400).json({ error: 'name, email, and phone are required' })
@@ -73,7 +76,7 @@ router.put('/:id', async (req, res) => {
 })
 
 // PATCH /drivers/:id/availability — toggle DriverAvailability
-router.patch('/:id/availability', requireWriteAuth, async (req, res) => {
+router.patch('/:id/availability', requireAvailabilityWriteAuth, async (req, res) => {
   const { available } = req.body
   if (typeof available !== 'boolean') {
     return res.status(400).json({ error: '"available" must be a boolean' })
@@ -94,7 +97,7 @@ router.patch('/:id/availability', requireWriteAuth, async (req, res) => {
 })
 
 // DELETE /drivers/:id
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', requireOperatorWriteAuth, async (req, res) => {
   try {
     const { rows } = await pool.query('DELETE FROM drivers WHERE id = $1 RETURNING id', [req.params.id])
     if (rows.length === 0) return res.status(404).json({ error: 'Driver not found' })

@@ -18,7 +18,7 @@ export function NotificationInboxItem({ isMarking = false, notification, onMarkR
   const isUnread = !notification?.readAt
   const sentAt = notificationTime(notification)
   const shipmentId = shipmentReference(notification)
-  const isShipmentDelay = notification?.type === 'shipment_delayed'
+  const isShipmentNotification = ['shipment_delayed', 'driver_delay_logged', 'driver_delivery_logged'].includes(notification?.type)
   const title = notification?.title || formatStatus(notification?.type || 'Notification')
   const message = notification?.message || 'No message was provided for this notification.'
 
@@ -34,7 +34,7 @@ export function NotificationInboxItem({ isMarking = false, notification, onMarkR
       <p>{message}</p>
       <div className="notification-item-footer">
         <span className="notification-object-label">
-          {isShipmentDelay ? 'Shipment' : formatStatus(notification?.type || 'Notification')}
+          {isShipmentNotification ? 'Shipment' : formatStatus(notification?.type || 'Notification')}
           {shipmentId ? ` ${compactId(shipmentId)}` : ''}
         </span>
         {isUnread && id ? (

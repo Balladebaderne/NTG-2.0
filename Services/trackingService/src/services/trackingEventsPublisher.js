@@ -4,6 +4,7 @@ const BROKER_EVENT_BY_TRACKING_EVENT = {
   goods_delivered: 'delivered',
   pod_confirmed: 'delivered',
   shipment_completed_closed: 'delivered',
+  goods_loaded_pickup_confirmed: 'intermediate_event',
   departed_origin_terminal: 'intermediate_event',
   in_transit_milestone: 'intermediate_event',
   arrived_destination_terminal: 'intermediate_event',

@@ -77,4 +77,90 @@ describe('Auth routes', () => {
       console.error.mockRestore()
     })
   })
+
+  describe('POST /auth/users', () => {
+    it('creates a user when the auth service accepts the request', async () => {
+      const authService = {
+        createUser: jest.fn().mockResolvedValue({
+          user: {
+            email: 'driver2@ntg.local',
+            id: 'driver-2',
+            name: 'Driver Two',
+            role: 'driver',
+            roleLabel: 'Driver',
+          },
+        }),
+        login: jest.fn(),
+      }
+      const app = createTestApp({ authService })
+
+      const res = await request(app)
+        .post('/auth/users')
+        .set('Authorization', 'Bearer admin-token')
+        .send({
+          email: 'driver2@ntg.local',
+          id: 'driver-2',
+          name: 'Driver Two',
+          password: 'driver123',
+          role: 'driver',
+        })
+
+      expect(res.status).toBe(201)
+      expect(res.body).toEqual({
+        user: {
+          email: 'driver2@ntg.local',
+          id: 'driver-2',
+          name: 'Driver Two',
+          role: 'driver',
+          roleLabel: 'Driver',
+        },
+      })
+      expect(authService.createUser).toHaveBeenCalledWith({
+        actorToken: 'admin-token',
+        user: {
+          email: 'driver2@ntg.local',
+          id: 'driver-2',
+          name: 'Driver Two',
+          password: 'driver123',
+          role: 'driver',
+        },
+      })
+    })
+
+    it('returns 403 when the caller is not an admin', async () => {
+      const error = new Error('Admin role required')
+      error.code = 'FORBIDDEN'
+      const authService = {
+        createUser: jest.fn().mockRejectedValue(error),
+        login: jest.fn(),
+      }
+      const app = createTestApp({ authService })
+
+      const res = await request(app)
+        .post('/auth/users')
+        .set('Authorization', 'Bearer support-token')
+        .send({ email: 'driver2@ntg.local', name: 'Driver Two', password: 'driver123', role: 'driver' })
+
+      expect(res.status).toBe(403)
+      expect(res.body).toEqual({ message: 'Admin role required' })
+    })
+
+    it('returns 409 for duplicate user records', async () => {
+      const error = new Error('Duplicate email')
+      error.code = 'DUPLICATE_EMAIL'
+      const authService = {
+        createUser: jest.fn().mockRejectedValue(error),
+        login: jest.fn(),
+      }
+      const app = createTestApp({ authService })
+
+      const res = await request(app)
+        .post('/auth/users')
+        .set('Authorization', 'Bearer admin-token')
+        .send({ email: 'driver2@ntg.local', name: 'Driver Two', password: 'driver123', role: 'driver' })
+
+      expect(res.status).toBe(409)
+      expect(res.body).toEqual({ message: 'A user with that email or id already exists.' })
+    })
+  })
 })

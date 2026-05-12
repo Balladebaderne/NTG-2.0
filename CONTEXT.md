@@ -60,6 +60,26 @@ _Avoid_: Reward points, credits, score
 A Shipment status change that is not the final delivery (i.e. not `received`), used as a trigger for awarding a smaller number of LoyaltyPoints to the assigned Driver. Originates from the trackingService via the message broker.
 _Avoid_: Status update, tracking event, partial event
 
+**MilestoneEvent**:
+A TrackingEvent that advances the Shipment lifecycle flow. Each MilestoneEvent has a defined position in the progression (e.g. "Goods loaded and pickup confirmed", "Goods delivered"). Only MilestoneEvents are used to determine which Driver actions are available next.
+_Avoid_: Flow event, lifecycle event, status event
+
+**SideEvent**:
+A TrackingEvent that annotates a Shipment without advancing the milestone flow (e.g. `delay_logged`, `exception_logged`). A SideEvent does not change which next MilestoneEvent is expected.
+_Avoid_: Non-flow event, annotation event, status update
+
+**StopConfirmation**:
+A driver-reported fact that a planned Route Stop has been physically reached, recording the actual arrival time. Triggered indirectly: the Driver logs a TrackingEvent; trackingService publishes it to the broker; routeService consumes it and maps the event type to the corresponding stop type to record the arrival.
+_Avoid_: GPS update, live location ping, tracking event (that term belongs to trackingService)
+
+**ETADelta**:
+The time difference between a Driver's actual arrival at a Stop and the planned arrival at that Stop, applied forward to shift the Route's EstimatedArrival.
+_Avoid_: ETA recalculation, live ETA
+
+**PolylineProgress**:
+The visual representation of Route completion derived client-side by splitting the stored encoded polyline at the coordinates of the last confirmed Stop. Not stored by routeService.
+_Avoid_: Live GPS trace, animated route, server-side progress index
+
 ## Relationships
 
 - A **Shipment** is created by a **CustomerSupportAgent** on behalf of a **Sender** and a **ReceiverCustomer**

@@ -2,9 +2,9 @@ import React, { useEffect, useMemo, useState } from 'react'
 import { listCustomers } from '../clients/customersClient'
 import { listDrivers, updateDriverAvailability } from '../clients/driversClient'
 import { listNotifications, scanDelayNotifications } from '../clients/notificationsClient'
-import { listRoutes } from '../clients/routesClient'
+import { createRoute, listRoutes } from '../clients/routesClient'
 import { listSenders } from '../clients/sendersClient'
-import { createShipment, listShipments, updateShipment } from '../clients/shipmentsClient'
+import { createShipment, deleteShipment, listShipments, updateShipment } from '../clients/shipmentsClient'
 import { getDelayedShipments, getDiscrepancies, getMissingEvents, listTickets } from '../clients/supportClient'
 import { getLatestTracking } from '../clients/trackingClient'
 import {
@@ -35,12 +35,20 @@ function initialCreateForm(profile) {
   return {
     description: 'General cargo',
     driverId: '',
-    estimatedArrivalAt: '',
+    plannedPickupAt: '',
     receiverCustomerId: 'customer-1',
     senderId: 'sender-1',
     totalVolumeM3: '2.5',
     totalWeightKG: '100',
     createdByCustomerServiceId: profile?.id || 'operator-console',
+    originStreet: '',
+    originCity: '',
+    originPostalCode: '',
+    originCountry: '',
+    destinationStreet: '',
+    destinationCity: '',
+    destinationPostalCode: '',
+    destinationCountry: '',
   }
 }
 
@@ -138,6 +146,44 @@ function OperatorMetrics({ state }) {
   )
 }
 
+function DriverAvailabilityList({ drivers, limit, onToggle }) {
+  const visibleDrivers = limit ? drivers.slice(0, limit) : drivers
+
+  if (drivers.length === 0) {
+    return <EmptyState compact message="No driver records are available." />
+  }
+
+  return (
+    <ul className="split-list driver-capacity-list">
+      {visibleDrivers.map((driver) => {
+        const label = driver.available ? 'Available' : 'Unavailable'
+        const className = driver.available ? 'driver-available-pill' : 'driver-unavailable-pill'
+
+        return (
+          <li key={driver.id}>
+            <div>
+              <strong>{driver.name}</strong>
+              <small>{driver.email} / {driver.phone}</small>
+            </div>
+            {onToggle ? (
+              <button
+                aria-label={`Set ${driver.name} ${driver.available ? 'unavailable' : 'available'}`}
+                className={className}
+                onClick={() => onToggle(driver)}
+                type="button"
+              >
+                {label}
+              </button>
+            ) : (
+              <span className={className}>{label}</span>
+            )}
+          </li>
+        )
+      })}
+    </ul>
+  )
+}
+
 function OperatorHero({ children, onRefresh, state, title }) {
   return (
     <section className="workspace-hero">
@@ -157,13 +203,14 @@ function OperatorHero({ children, onRefresh, state, title }) {
 }
 
 function AssignmentPanel({ onAssigned, state, token }) {
+  const availableDrivers = state.drivers.filter((driver) => driver.available)
   const [form, setForm] = useState({ driverId: '', shipmentId: '' })
   const [message, setMessage] = useState('')
   const [busy, setBusy] = useState(false)
 
   useEffect(() => {
     setForm((current) => ({
-      driverId: current.driverId || state.drivers[0]?.id || '',
+      driverId: current.driverId || availableDrivers[0]?.id || '',
       shipmentId: current.shipmentId || state.shipments[0]?._id || '',
     }))
   }, [state.drivers, state.shipments])
@@ -200,14 +247,18 @@ function AssignmentPanel({ onAssigned, state, token }) {
       </label>
       <label className="field">
         <span>Driver</span>
-        <select onChange={(event) => setForm((current) => ({ ...current, driverId: event.target.value }))} value={form.driverId}>
-          {state.drivers.map((driver) => (
-            <option key={driver.id} value={driver.id}>{driver.name} / {driver.available ? 'Available' : 'Unavailable'}</option>
-          ))}
-        </select>
+        {availableDrivers.length === 0 ? (
+          <Notice tone="warning">No drivers are currently available.</Notice>
+        ) : (
+          <select onChange={(event) => setForm((current) => ({ ...current, driverId: event.target.value }))} value={form.driverId}>
+            {availableDrivers.map((driver) => (
+              <option key={driver.id} value={driver.id}>{driver.name}</option>
+            ))}
+          </select>
+        )}
       </label>
       {message ? <Notice tone={message.includes('assigned') ? 'subtle' : 'warning'}>{message}</Notice> : null}
-      <button className="button-primary" disabled={busy || state.shipments.length === 0 || state.drivers.length === 0} type="submit">
+      <button className="button-primary" disabled={busy || state.shipments.length === 0 || availableDrivers.length === 0} type="submit">
         {busy ? 'Assigning' : 'Assign driver'}
       </button>
     </form>
@@ -232,6 +283,16 @@ function CreateShipmentForm({ onCreated, profile, state, token }) {
       return
     }
 
+    if (!form.originCity || !form.originCountry) {
+      setMessage('Origin city and country are required.')
+      return
+    }
+
+    if (!form.destinationCity || !form.destinationCountry) {
+      setMessage('Destination city and country are required.')
+      return
+    }
+
     setBusy(true)
     const totalWeightKG = Number(form.totalWeightKG)
     const totalVolumeM3 = Number(form.totalVolumeM3)
@@ -245,20 +306,50 @@ function CreateShipmentForm({ onCreated, profile, state, token }) {
       }]
       : []
 
+    const originAddress = {
+      street: form.originStreet || null,
+      city: form.originCity,
+      postalCode: form.originPostalCode || null,
+      country: form.originCountry,
+    }
+    const destinationAddress = {
+      street: form.destinationStreet || null,
+      city: form.destinationCity,
+      postalCode: form.destinationPostalCode || null,
+      country: form.destinationCountry,
+    }
+
+    let shipment
     try {
-      const shipment = await createShipment({
+      shipment = await createShipment({
         createdByCustomerServiceId: form.createdByCustomerServiceId,
         driverId: form.driverId || null,
-        estimatedArrivalAt: form.estimatedArrivalAt ? new Date(form.estimatedArrivalAt).toISOString() : null,
         goods,
+        originAddress,
+        destinationAddress,
         receiverCustomerId: form.receiverCustomerId,
         senderId: form.senderId,
         status: 'booked',
       }, { token })
-      setMessage(`Shipment ${compactId(shipment._id)} created.`)
-      onCreated?.()
     } catch (error) {
       setMessage(error.message)
+      setBusy(false)
+      return
+    }
+
+    try {
+      await createRoute({
+        shipmentId: shipment._id,
+        origin: { address: originAddress },
+        destination: { address: destinationAddress },
+        plannedPickupAt: form.plannedPickupAt ? new Date(form.plannedPickupAt).toISOString() : null,
+      }, { token })
+      setMessage(`Shipment ${compactId(shipment._id)} created with route.`)
+      onCreated?.()
+    } catch (error) {
+      // Route creation failed — roll back shipment to preserve atomicity
+      try { await deleteShipment(shipment._id, { token }) } catch (_) { /* best effort */ }
+      setMessage(`Route creation failed: ${error.message}. Shipment was not saved.`)
     } finally {
       setBusy(false)
     }
@@ -291,19 +382,67 @@ function CreateShipmentForm({ onCreated, profile, state, token }) {
         </label>
       </div>
 
+      <fieldset>
+        <legend>Origin (pickup)</legend>
+        <div className="form-grid two">
+          <label className="field">
+            <span>Street</span>
+            <input onChange={(event) => updateField('originStreet', event.target.value)} placeholder="Optional" value={form.originStreet} />
+          </label>
+          <label className="field">
+            <span>Postal code</span>
+            <input onChange={(event) => updateField('originPostalCode', event.target.value)} placeholder="Optional" value={form.originPostalCode} />
+          </label>
+        </div>
+        <div className="form-grid two">
+          <label className="field">
+            <span>City *</span>
+            <input onChange={(event) => updateField('originCity', event.target.value)} required value={form.originCity} />
+          </label>
+          <label className="field">
+            <span>Country *</span>
+            <input onChange={(event) => updateField('originCountry', event.target.value)} required value={form.originCountry} />
+          </label>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Destination (delivery)</legend>
+        <div className="form-grid two">
+          <label className="field">
+            <span>Street</span>
+            <input onChange={(event) => updateField('destinationStreet', event.target.value)} placeholder="Optional" value={form.destinationStreet} />
+          </label>
+          <label className="field">
+            <span>Postal code</span>
+            <input onChange={(event) => updateField('destinationPostalCode', event.target.value)} placeholder="Optional" value={form.destinationPostalCode} />
+          </label>
+        </div>
+        <div className="form-grid two">
+          <label className="field">
+            <span>City *</span>
+            <input onChange={(event) => updateField('destinationCity', event.target.value)} required value={form.destinationCity} />
+          </label>
+          <label className="field">
+            <span>Country *</span>
+            <input onChange={(event) => updateField('destinationCountry', event.target.value)} required value={form.destinationCountry} />
+          </label>
+        </div>
+      </fieldset>
+
       <div className="form-grid two">
         <label className="field">
           <span>Driver assignment</span>
           <select onChange={(event) => updateField('driverId', event.target.value)} value={form.driverId}>
             <option value="">Assign later</option>
-            {state.drivers.map((driver) => (
+            {state.drivers.filter((driver) => driver.available).map((driver) => (
               <option key={driver.id} value={driver.id}>{driver.name}</option>
             ))}
           </select>
         </label>
         <label className="field">
-          <span>Delivery estimate</span>
-          <input onChange={(event) => updateField('estimatedArrivalAt', event.target.value)} type="datetime-local" value={form.estimatedArrivalAt} />
+          <span>Planned pickup</span>
+          <input onChange={(event) => updateField('plannedPickupAt', event.target.value)} type="datetime-local" value={form.plannedPickupAt} />
         </label>
       </div>
 
@@ -385,7 +524,7 @@ export function OperatorDashboardPage({ onNavigate, onSignOut, profile, token })
             </aside>
           </div>
 
-          <div className="panel-grid equal">
+          <div className="panel-grid three">
             <section className="panel">
               <div className="panel-heading">
                 <div>
@@ -408,6 +547,19 @@ export function OperatorDashboardPage({ onNavigate, onSignOut, profile, token })
                 <li><div><strong>Data discrepancies</strong><small>Missing goods or route records</small></div><span>{formatNumber(state.discrepancies.length)}</span></li>
                 <li><div><strong>Missing events</strong><small>Shipments with incomplete operational records</small></div><span>{formatNumber(state.missingEvents.length)}</span></li>
               </ul>
+            </section>
+
+            <section className="panel">
+              <div className="panel-heading">
+                <div>
+                  <span>Driver service</span>
+                  <h2>Availability</h2>
+                </div>
+                <button className="button-secondary compact" onClick={() => onNavigate('/operator/drivers')} type="button">
+                  Open drivers
+                </button>
+              </div>
+              <DriverAvailabilityList drivers={state.drivers} limit={5} />
             </section>
           </div>
         </>
@@ -519,19 +671,7 @@ export function OperatorDriversPage({ onNavigate, onSignOut, profile, token }) {
               <h2>Drivers</h2>
             </div>
           </div>
-          <ul className="split-list">
-            {state.drivers.map((driver) => (
-              <li key={driver.id}>
-                <div>
-                  <strong>{driver.name}</strong>
-                  <small>{driver.email} / {driver.phone}</small>
-                </div>
-                <button className="button-secondary compact" onClick={() => toggleDriver(driver)} type="button">
-                  {driver.available ? 'Available' : 'Unavailable'}
-                </button>
-              </li>
-            ))}
-          </ul>
+          <DriverAvailabilityList drivers={state.drivers} onToggle={toggleDriver} />
         </section>
       )}
     </AppShell>

@@ -1,7 +1,7 @@
 const {
   applyRouteCalculation,
   applyRouteCalculationFailure,
-} = require('../services/routeCalculation')
+} = require('../modules/routeCalculation')
 
 const routeInput = {
   shipmentId: 'shipment-1',

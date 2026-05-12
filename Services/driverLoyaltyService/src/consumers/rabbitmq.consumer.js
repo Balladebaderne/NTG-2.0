@@ -22,6 +22,10 @@ async function startShipmentEventConsumer() {
     return { status: 'skipped', reason: 'loyalty event consumer disabled' }
   }
 
+  return startWithRetry(connectShipmentEventConsumer)
+}
+
+async function connectShipmentEventConsumer() {
   const exchange = process.env.TRACKING_EVENTS_EXCHANGE || 'tracking.events'
   const queueName = process.env.LOYALTY_EVENTS_QUEUE || 'driver-loyalty.tracking-events'
   const connection = await amqp.connect(connectionTarget())
@@ -50,4 +54,27 @@ async function startShipmentEventConsumer() {
   return { status: 'consuming', queue: queue.queue }
 }
 
-module.exports = { startShipmentEventConsumer }
+async function startWithRetry(connect, {
+  logger = console,
+  maxAttempts = Infinity,
+  retryDelayMs = Number(process.env.LOYALTY_CONSUMER_RETRY_DELAY_MS || 5000),
+} = {}) {
+  let attempt = 0
+
+  while (attempt < maxAttempts) {
+    attempt += 1
+
+    try {
+      return await connect()
+    } catch (err) {
+      if (attempt >= maxAttempts) throw err
+
+      logger.warn(`Driver Loyalty consumer start failed (${err.message}); retrying in ${retryDelayMs}ms`)
+      await new Promise((resolve) => setTimeout(resolve, retryDelayMs))
+    }
+  }
+
+  return { status: 'skipped', reason: 'max retry attempts reached' }
+}
+
+module.exports = { connectShipmentEventConsumer, startShipmentEventConsumer, startWithRetry }

@@ -136,7 +136,8 @@ const roleNav = {
 
 export function normalizeRole(role) {
   if (role === 'driver') return 'driver'
-  if (role === 'admin' || role === 'logistics' || role === 'support') return 'operator'
+  if (role === 'admin' || role === 'support') return 'operator'
+  if (role === 'logistics') return 'customer'
   return 'customer'
 }
 
@@ -179,7 +180,26 @@ export function BrandMark({ onClick, inverted = false }) {
   )
 }
 
+function HamburgerIcon({ isOpen }) {
+  return (
+    <svg aria-hidden="true" fill="none" height="22" viewBox="0 0 24 24" width="22">
+      <g stroke="currentColor" strokeLinecap="round" strokeWidth="2">
+        {isOpen ? (
+          <path d="M18 6 6 18M6 6l12 12" />
+        ) : (
+          <>
+            <path d="M4 6h16" />
+            <path d="M4 12h16" />
+            <path d="M4 18h16" />
+          </>
+        )}
+      </g>
+    </svg>
+  )
+}
+
 export function PublicHeader({ active = 'home', onNavigate }) {
+  const [isOpen, setIsOpen] = useState(false)
   const items = [
     { id: 'home', label: 'Home', path: '/' },
     { id: 'services', label: 'Services', path: '/services' },
@@ -187,44 +207,86 @@ export function PublicHeader({ active = 'home', onNavigate }) {
     { id: 'contact', label: 'Contact', path: '/contact' },
   ]
 
+  function handleNav(path) {
+    setIsOpen(false)
+    onNavigate(path)
+  }
+
   return (
     <header className="site-header">
-      <BrandMark onClick={() => onNavigate('/')} />
+      <BrandMark onClick={() => handleNav('/')} />
       <nav aria-label="Public navigation" className="site-nav">
         {items.map((item) => (
           <button
             aria-current={active === item.id ? 'page' : undefined}
             className={active === item.id ? 'is-active' : undefined}
             key={item.id}
-            onClick={() => onNavigate(item.path)}
+            onClick={() => handleNav(item.path)}
             type="button"
           >
             {item.label}
           </button>
         ))}
       </nav>
-      <button className="button-primary compact" onClick={() => onNavigate('/login')} type="button">
+      <button className="button-primary compact" onClick={() => handleNav('/login')} type="button">
         Sign in
       </button>
+      <button
+        aria-expanded={isOpen}
+        aria-label={isOpen ? 'Luk menu' : 'Åbn menu'}
+        className="mobile-menu-toggle"
+        onClick={() => setIsOpen(!isOpen)}
+        type="button"
+      >
+        <HamburgerIcon isOpen={isOpen} />
+      </button>
+      {isOpen && (
+        <div className="mobile-nav">
+          <nav className="mobile-nav-links">
+            {items.map((item) => (
+              <button
+                aria-current={active === item.id ? 'page' : undefined}
+                className={active === item.id ? 'is-active' : undefined}
+                key={item.id}
+                onClick={() => handleNav(item.path)}
+                type="button"
+              >
+                {item.label}
+              </button>
+            ))}
+          </nav>
+          <div className="mobile-nav-footer">
+            <button className="button-primary" onClick={() => handleNav('/login')} type="button">
+              Sign in
+            </button>
+          </div>
+        </div>
+      )}
     </header>
   )
 }
 
 export function SignedInHeader({ active, onNavigate, onSignOut, profile, token }) {
+  const [isOpen, setIsOpen] = useState(false)
   const role = normalizeRole(profile?.role)
   const items = roleNav[role]
   const hasNotificationInbox = canUseNotificationInbox(profile)
 
+  function handleNav(path) {
+    setIsOpen(false)
+    onNavigate(path)
+  }
+
   return (
     <header className="site-header signed-in-header">
-      <BrandMark inverted onClick={() => onNavigate(roleHomePath(profile))} />
+      <BrandMark inverted onClick={() => handleNav(roleHomePath(profile))} />
       <nav aria-label="Role navigation" className="site-nav">
         {items.map((item) => (
           <button
             aria-current={active === item.id ? 'page' : undefined}
             className={active === item.id ? 'is-active' : undefined}
             key={item.id}
-            onClick={() => onNavigate(item.path)}
+            onClick={() => handleNav(item.path)}
             type="button"
           >
             {item.label}
@@ -241,6 +303,45 @@ export function SignedInHeader({ active, onNavigate, onSignOut, profile, token }
           Sign out
         </button>
       </div>
+      <button
+        aria-expanded={isOpen}
+        aria-label={isOpen ? 'Luk menu' : 'Åbn menu'}
+        className="mobile-menu-toggle"
+        onClick={() => setIsOpen(!isOpen)}
+        type="button"
+      >
+        <HamburgerIcon isOpen={isOpen} />
+      </button>
+      {isOpen && (
+        <div className="mobile-nav signed-in-mobile-nav">
+          <nav className="mobile-nav-links">
+            {items.map((item) => (
+              <button
+                aria-current={active === item.id ? 'page' : undefined}
+                className={active === item.id ? 'is-active' : undefined}
+                key={item.id}
+                onClick={() => handleNav(item.path)}
+                type="button"
+              >
+                {item.label}
+              </button>
+            ))}
+          </nav>
+          <div className="mobile-nav-footer">
+            <div className="mobile-profile">
+              <span>{profile?.roleLabel || formatStatus(role)}</span>
+              <strong>{profile?.name || 'NTG user'}</strong>
+            </div>
+            <button
+              className="button-secondary compact"
+              onClick={() => { setIsOpen(false); onSignOut() }}
+              type="button"
+            >
+              Sign out
+            </button>
+          </div>
+        </div>
+      )}
     </header>
   )
 }
@@ -454,17 +555,22 @@ export function Timeline({ events = [] }) {
 
   return (
     <ol className="timeline">
-      {rows.map((event, index) => (
-        <li className={String(event.eventType || '').includes('delay') || String(event.eventType || '').includes('exception') ? 'is-warning' : ''} key={event.trackingEventId || event.eventId || index}>
-          <div className="timeline-marker" aria-hidden="true" />
-          <div>
-            <strong>{event.eventLabel || formatStatus(event.eventType)}</strong>
-            <span>{formatDateTime(event.occurredAt || event.createdAt)}</span>
-            <p>{event.location?.label || event.locationName || 'Location not registered'}</p>
-            {event.notes ? <small>{event.notes}</small> : null}
-          </div>
-        </li>
-      ))}
+      {rows.map((event, index) => {
+        const isWarning = String(event.eventType || '').includes('delay') || String(event.eventType || '').includes('exception')
+        const isPlanned = Boolean(event.isPlanned)
+        const className = [isWarning ? 'is-warning' : '', isPlanned ? 'is-planned' : ''].filter(Boolean).join(' ')
+        return (
+          <li className={className || undefined} key={event.trackingEventId || event.eventId || index}>
+            <div className="timeline-marker" aria-hidden="true" />
+            <div>
+              <strong>{event.eventLabel || formatStatus(event.eventType)}</strong>
+              <span>{isPlanned ? `Planned ${formatDateTime(event.occurredAt || event.createdAt)}` : formatDateTime(event.occurredAt || event.createdAt)}</span>
+              <p>{event.location?.label || event.locationName || 'Location not registered'}</p>
+              {event.notes ? <small>{event.notes}</small> : null}
+            </div>
+          </li>
+        )
+      })}
     </ol>
   )
 }

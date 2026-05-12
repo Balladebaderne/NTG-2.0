@@ -1,0 +1,116 @@
+flowchart TD
+    A["App opens"] --> B{"Token in localStorage?"}
+
+    B -- "No" --> C["Login screen"]
+    B -- "Yes" --> H["Read JWT payload"]
+
+    C --> D["User enters<br/>email and password"]
+    D --> E["POST /auth/login"]
+    E --> F["loginService<br/>validates user"]
+    F --> G{"Login approved?"}
+
+    G -- "No" --> C
+    G -- "Yes" --> I["Backend returns JWT<br/>id, name, email, role"]
+    I --> J["Frontend stores token<br/>in localStorage"]
+    J --> H
+
+    H --> K{"Role in token"}
+
+    K -- "customer / logistics" --> C1
+    K -- "driver" --> D1
+    K -- "admin / support" --> O1
+
+    subgraph CUSTOMER["Customer flow"]
+      direction TB
+      C1["Customer dashboard"]
+      C2["Own shipments<br/>linked to customer ID"]
+      C3["Search and filter shipments"]
+      C4["Shipment detail"]
+      C5["View status, ETA<br/>and tracking history"]
+      C6["Read-only shipment data"]
+      C7["Create support ticket<br/>for support role"]
+      C8["AI chat<br/>Ask about accessible shipments and ETA"]
+
+      C1 --> C2
+      C2 --> C3
+      C3 --> C4
+      C4 --> C5
+      C5 --> C6
+      C6 --> C7
+      C1 --> C8
+    end
+
+    subgraph DRIVER["Driver flow"]
+      direction TB
+      D1["Driver dashboard"]
+      D2["Assigned shipments"]
+      D3["Open shipment"]
+      D4["Update shipment"]
+      D5["Register tracking events<br/>pickup, terminal, delay, delivery"]
+      D6["Publish delay notification<br/>if shipment is delayed"]
+      D7["Change availability"]
+      D8["View own loyalty points"]
+
+      D1 --> D2
+      D2 --> D3
+      D3 --> D4
+      D4 --> D5
+      D5 --> D6
+      D1 --> D7
+      D1 --> D8
+    end
+
+    subgraph OPERATOR["Operator flow"]
+      direction TB
+      O1["Operator dashboard"]
+      O2["Shipment management"]
+      O3["Create shipment"]
+      O4["Create route"]
+      O5["Assign/update driver"]
+      O6["Update shipment"]
+      O7["Drivers and customers"]
+      O8["Support data and tickets"]
+      O9["Run delay scans"]
+      O10["Delay notification<br/>for admin/support"]
+      O11["View backend service status"]
+      O12["AI chat<br/>Ask about accessible shipments, ETA and delays"]
+
+      O1 --> O2
+      O2 --> O3
+      O3 --> O4
+      O4 --> O5
+      O2 --> O6
+      O1 --> O7
+      O1 --> O8
+      O1 --> O9
+      O9 --> O10
+      O1 --> O11
+      O1 --> O12
+    end
+
+    C7 --> API
+    C8 --> API
+    D5 --> API
+    D7 --> API
+    O5 --> API
+    O6 --> API
+    O8 --> API
+    O9 --> API
+    O12 --> API
+
+    API["Backend validates<br/>Authorization: Bearer JWT<br/>and user role"] --> P{"Does the role<br/>have permission?"}
+
+    P -- "Yes" --> OK["Action is completed"]
+    P -- "No" --> DENIED["403 Forbidden"]
+
+    classDef auth fill:#eef2ff,stroke:#4f46e5,color:#111827;
+    classDef customer fill:#ecfdf5,stroke:#059669,color:#111827;
+    classDef driver fill:#fff7ed,stroke:#ea580c,color:#111827;
+    classDef operator fill:#fef2f2,stroke:#dc2626,color:#111827;
+    classDef backend fill:#f8fafc,stroke:#475569,color:#111827;
+
+    class A,B,C,D,E,F,G,H,I,J,K auth;
+    class C1,C2,C3,C4,C5,C6,C7,C8 customer;
+    class D1,D2,D3,D4,D5,D6,D7,D8 driver;
+    class O1,O2,O3,O4,O5,O6,O7,O8,O9,O10,O11,O12 operator;
+    class API,P,OK,DENIED backend;

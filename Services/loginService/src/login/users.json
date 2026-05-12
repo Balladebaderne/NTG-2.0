@@ -8,8 +8,8 @@
     "roleLabel": "Admin"
   },
   {
-    "id": "usr_driver",
-    "name": "NTG Driver",
+    "id": "00000000-0000-0000-0000-000000000001",
+    "name": "Anders Nielsen",
     "email": "driver@ntg.local",
     "password": "driver123",
     "role": "driver",
@@ -33,6 +33,7 @@
   },
   {
     "id": "usr_logistics",
+    "customerId": "customer-1",
     "name": "NTG Logistics Manager",
     "email": "logistics@ntg.local",
     "password": "logistics123",

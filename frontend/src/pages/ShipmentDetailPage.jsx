@@ -3,6 +3,7 @@ import { listNotifications } from '../clients/notificationsClient'
 import { listRoutes } from '../clients/routesClient'
 import { getShipment } from '../clients/shipmentsClient'
 import { getTrackingStatus } from '../clients/trackingClient'
+import { RouteMap } from '../components/RouteMap'
 import {
   AppShell,
   EmptyState,
@@ -126,34 +127,34 @@ export function ShipmentDetailPage({
 
       {!state.loading && state.shipment ? (
         <>
-          <div className="panel-grid equal">
-            <section className="panel">
-              <div className="panel-heading">
-                <div>
-                  <span>Overview</span>
-                  <h2>Shipment summary</h2>
-                </div>
-                <StatusBadge status={state.shipment.status} />
+          <section className="panel">
+            <div className="panel-heading">
+              <div>
+                <span>Overview</span>
+                <h2>Shipment summary</h2>
               </div>
-              <dl className="definition-grid">
-                <div><dt>Sender</dt><dd>{compactId(state.shipment.senderId)}</dd></div>
-                <div><dt>Receiver</dt><dd>{compactId(state.shipment.receiverCustomerId)}</dd></div>
-                <div><dt>Driver</dt><dd>{compactId(state.shipment.driverId)}</dd></div>
-                <div><dt>Route</dt><dd>{compactId(state.shipment.routeId)}</dd></div>
-                <div><dt>Created</dt><dd>{formatDateTime(state.shipment.createdAt)}</dd></div>
-                <div><dt>ETA</dt><dd>{formatDateTime(state.shipment.estimatedArrivalAt)}</dd></div>
-              </dl>
-            </section>
+              <StatusBadge status={state.shipment.status} />
+            </div>
+            <dl className="definition-grid">
+              <div><dt>Sender</dt><dd>{compactId(state.shipment.senderId)}</dd></div>
+              <div><dt>Receiver</dt><dd>{compactId(state.shipment.receiverCustomerId)}</dd></div>
+              <div><dt>Driver</dt><dd>{compactId(state.shipment.driverId)}</dd></div>
+              <div><dt>Route</dt><dd>{compactId(state.shipment.routeId)}</dd></div>
+              <div><dt>Created</dt><dd>{formatDateTime(state.shipment.createdAt)}</dd></div>
+              <div><dt>ETA</dt><dd>{formatDateTime(state.shipment.estimatedArrivalAt)}</dd></div>
+            </dl>
+          </section>
 
-            <section className="panel">
-              <div className="panel-heading">
-                <div>
-                  <span>Route</span>
-                  <h2>Transport plan</h2>
-                </div>
-                <span>{route ? formatStatus(route.status) : 'No route'}</span>
+          <section className="panel">
+            <div className="panel-heading">
+              <div>
+                <span>Route</span>
+                <h2>Transport plan</h2>
               </div>
-              {route ? (
+              <span>{route ? formatStatus(route.status) : 'No route'}</span>
+            </div>
+            {route ? (
+              <>
                 <div className="panel-grid equal">
                   <div>
                     <h3>Origin</h3>
@@ -164,16 +165,19 @@ export function ShipmentDetailPage({
                     <AddressBlock address={route.destination?.address} />
                   </div>
                 </div>
-              ) : (
-                <EmptyState compact message="No route plan is linked yet." title="No route" />
-              )}
-            </section>
-          </div>
-
-          <section className="panel">
-            <SectionHeader eyebrow={`${history.length} events`} title="Tracking timeline" />
-            <Timeline events={history} />
+                <RouteMap route={route} />
+              </>
+            ) : (
+              <EmptyState compact message="No route plan is linked yet." title="No route" />
+            )}
           </section>
+
+          {profile?.role !== 'driver' && (
+            <section className="panel">
+              <SectionHeader eyebrow={`${history.length} events`} title="Live tracking" />
+              <Timeline events={history} />
+            </section>
+          )}
 
           <div className="panel-grid equal">
             <section className="panel">

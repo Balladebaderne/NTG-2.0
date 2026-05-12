@@ -301,6 +301,7 @@ function normalizeStopRow(row) {
     location: row.location ? parseJsonColumn(row.location) : null,
     plannedArrivalAt: row.planned_arrival_at,
     plannedDepartureAt: row.planned_departure_at,
+    actualArrivalAt: row.actual_arrival_at || null,
     notes: row.notes,
     metadata: row.metadata ? parseJsonColumn(row.metadata) : null,
     createdAt: row.created_at,
@@ -528,6 +529,27 @@ async function update(routeId, input) {
   }
 }
 
+async function confirmNextStopByType(routeId, stopTypes, confirmedAt) {
+  const result = await pool.query(
+    `
+      SELECT stop_id
+      FROM route_stops
+      WHERE route_id = $1
+        AND type = ANY($2)
+        AND actual_arrival_at IS NULL
+      ORDER BY sequence ASC
+      LIMIT 1
+    `,
+    [routeId, stopTypes]
+  )
+
+  const row = result.rows[0]
+  if (!row) return null
+
+  return confirmStop(routeId, row.stop_id, confirmedAt)
+}
+
+
 async function remove(routeId) {
   const result = await pool.query(
     `
@@ -541,10 +563,80 @@ async function remove(routeId) {
   return result.rows[0] || null
 }
 
+async function confirmStop(routeId, stopId, actualArrivalAt) {
+  const client = await pool.connect()
+  try {
+    await client.query('BEGIN')
+
+    const stopResult = await client.query(
+      `
+        UPDATE route_stops
+        SET actual_arrival_at = $1, updated_at = NOW()
+        WHERE stop_id = $2 AND route_id = $3
+        RETURNING *
+      `,
+      [actualArrivalAt, stopId, routeId]
+    )
+
+    if (!stopResult.rows[0]) {
+      await client.query('ROLLBACK')
+      return null
+    }
+
+    const stop = normalizeStopRow(stopResult.rows[0])
+
+    const routeResult = await client.query(
+      `SELECT * FROM route_plans WHERE route_id = $1 LIMIT 1`,
+      [routeId]
+    )
+
+    if (!routeResult.rows[0]) {
+      await client.query('ROLLBACK')
+      return null
+    }
+
+    const route = routeResult.rows[0]
+    const plannedArrivalAt = stop.plannedArrivalAt ? new Date(stop.plannedArrivalAt) : null
+    const confirmedAt = new Date(actualArrivalAt)
+
+    let newEstimatedArrivalAt = route.estimated_arrival_at
+    if (plannedArrivalAt && route.estimated_arrival_at) {
+      const deltaMs = confirmedAt.getTime() - plannedArrivalAt.getTime()
+      newEstimatedArrivalAt = new Date(new Date(route.estimated_arrival_at).getTime() + deltaMs)
+    }
+
+    let newStatus = route.status
+    if (route.status === 'planned') newStatus = 'active'
+    if (stop.type === 'delivery') newStatus = 'completed'
+
+    const updatedRoute = await client.query(
+      `
+        UPDATE route_plans
+        SET estimated_arrival_at = $2, status = $3, updated_at = NOW()
+        WHERE route_id = $1
+        RETURNING *
+      `,
+      [routeId, newEstimatedArrivalAt, newStatus]
+    )
+
+    const stops = await loadStops(routeId, client)
+    await client.query('COMMIT')
+
+    return normalizeRoute(updatedRoute.rows[0], stops)
+  } catch (err) {
+    await client.query('ROLLBACK')
+    throw err
+  } finally {
+    client.release()
+  }
+}
+
 module.exports = {
   VALID_ROUTE_STATUSES,
   VALID_STOP_TYPES,
   buildRouteInput,
+  confirmNextStopByType,
+  confirmStop,
   create,
   findById,
   list,
