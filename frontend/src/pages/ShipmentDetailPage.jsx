@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { listNotifications } from '../clients/notificationsClient'
 import { listRoutes } from '../clients/routesClient'
-import { getShipment } from '../clients/shipmentsClient'
+import { deleteShipment, getShipment } from '../clients/shipmentsClient'
 import { getTrackingStatus } from '../clients/trackingClient'
 import { RouteMap } from '../components/RouteMap'
 import {
@@ -38,6 +38,8 @@ function AddressBlock({ address }) {
   )
 }
 
+const DELETE_ROLES = new Set(['admin', 'support'])
+
 export function ShipmentDetailPage({
   active = 'customer-shipments',
   onNavigate,
@@ -54,6 +56,9 @@ export function ShipmentDetailPage({
     shipment: null,
     tracking: null,
   })
+  const [deleteState, setDeleteState] = useState({ busy: false, confirming: false, error: null })
+
+  const canDelete = DELETE_ROLES.has(String(profile?.role || '').toLowerCase())
 
   async function loadShipmentDetail() {
     setState((current) => ({ ...current, errors: [], loading: true }))
@@ -97,6 +102,20 @@ export function ShipmentDetailPage({
     loadShipmentDetail()
   }, [shipmentId, token])
 
+  async function handleDelete() {
+    if (!deleteState.confirming) {
+      setDeleteState({ busy: false, confirming: true, error: null })
+      return
+    }
+    setDeleteState({ busy: true, confirming: true, error: null })
+    try {
+      await deleteShipment(shipmentId, { token })
+      onNavigate('/operator/shipments')
+    } catch (error) {
+      setDeleteState({ busy: false, confirming: false, error: error.message })
+    }
+  }
+
   const route = state.routes[0]
   const history = asArray(state.tracking?.history)
 
@@ -109,12 +128,31 @@ export function ShipmentDetailPage({
           <p>Full shipment view with lifecycle status, route information, goods, notifications, and event history.</p>
         </div>
         <div className="workspace-hero-actions">
+          {canDelete && deleteState.confirming ? (
+            <>
+              <button className="button-secondary" disabled={deleteState.busy} onClick={() => setDeleteState({ busy: false, confirming: false, error: null })} type="button">
+                Cancel
+              </button>
+              <button className="button-danger" disabled={deleteState.busy} onClick={handleDelete} type="button">
+                {deleteState.busy ? 'Deleting' : 'Confirm delete'}
+              </button>
+            </>
+          ) : null}
+          {canDelete && !deleteState.confirming ? (
+            <button className="button-danger" disabled={state.loading || !state.shipment} onClick={handleDelete} type="button">
+              Delete shipment
+            </button>
+          ) : null}
           <button className="button-primary" disabled={state.loading} onClick={loadShipmentDetail} type="button">
             {state.loading ? 'Refreshing' : 'Refresh'}
           </button>
         </div>
       </section>
 
+      {deleteState.error ? <Notice tone="warning">{deleteState.error}</Notice> : null}
+      {deleteState.confirming && !deleteState.busy ? (
+        <Notice tone="warning">Er du sikker? Denne handling kan ikke fortrydes.</Notice>
+      ) : null}
       {state.errors.length > 0 ? (
         <Notice tone="warning">
           <strong>Some shipment services did not answer.</strong>

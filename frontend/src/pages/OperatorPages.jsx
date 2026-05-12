@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { listCustomers } from '../clients/customersClient'
-import { listDrivers, updateDriverAvailability } from '../clients/driversClient'
+import { createUser } from '../clients/authClient'
+import { createCustomer, deleteCustomer, listCustomers } from '../clients/customersClient'
+import { createDriver, deleteDriver, listDrivers, updateDriverAvailability } from '../clients/driversClient'
+import { getDriverPoints } from '../clients/loyaltyClient'
 import { listNotifications, scanDelayNotifications } from '../clients/notificationsClient'
 import { createRoute, listRoutes } from '../clients/routesClient'
 import { listSenders } from '../clients/sendersClient'
@@ -31,6 +33,32 @@ function formatNumber(value) {
   return new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 }).format(value || 0)
 }
 
+function pointTotalFromPayload(payload) {
+  const points = Number(payload?.totalPoints ?? payload?.points ?? 0)
+  return Number.isFinite(points) ? points : 0
+}
+
+function compareDriversByPoints(first, second) {
+  const firstPoints = Number(first.loyaltyPoints || 0)
+  const secondPoints = Number(second.loyaltyPoints || 0)
+  const pointDifference = secondPoints - firstPoints
+
+  if (pointDifference !== 0) return pointDifference
+  return String(first.name || first.id).localeCompare(String(second.name || second.id))
+}
+
+function sortDriversByPoints(drivers) {
+  return [...drivers].sort(compareDriversByPoints)
+}
+
+function formatDriverAssignmentOption(driver) {
+  if (driver.loyaltyPointsLoaded === false) {
+    return `${driver.name} / points unavailable`
+  }
+
+  return `${driver.name} / ${formatNumber(driver.loyaltyPoints)} pts`
+}
+
 function initialCreateForm(profile) {
   return {
     description: 'General cargo',
@@ -50,6 +78,28 @@ function initialCreateForm(profile) {
     destinationPostalCode: '',
     destinationCountry: '',
   }
+}
+
+async function loadDriverPoints(drivers, token) {
+  if (drivers.length === 0) return drivers
+
+  const results = await Promise.all(
+    drivers.map((driver) => settle(`Driver points for ${driver.name || compactId(driver.id)}`, getDriverPoints(driver.id, { token })))
+  )
+
+  return drivers.map((driver, index) => {
+    const result = results[index]
+
+    if (!result.ok) {
+      return { ...driver, loyaltyPoints: 0, loyaltyPointsLoaded: false }
+    }
+
+    return {
+      ...driver,
+      loyaltyPoints: pointTotalFromPayload(result.value),
+      loyaltyPointsLoaded: true,
+    }
+  })
 }
 
 function useOperatorData({ token }) {
@@ -88,15 +138,18 @@ function useOperatorData({ token }) {
 
     const valueFor = (label) => results.find((result) => result.label === label)
     const shipments = asArray(valueFor('Shipments')?.value)
-    const trackingResults = await Promise.all(
-      shipments.slice(0, 10).map((shipment) => settle(`Tracking ${shipment._id}`, getLatestTracking(shipment._id, { token })))
-    )
+    const [driversWithPoints, trackingResults] = await Promise.all([
+      loadDriverPoints(asArray(valueFor('Drivers')?.value), token),
+      Promise.all(
+        shipments.slice(0, 10).map((shipment) => settle(`Tracking ${shipment._id}`, getLatestTracking(shipment._id, { token })))
+      ),
+    ])
 
     setState({
       customers: asArray(valueFor('Customers')?.value),
       delayed: asArray(valueFor('Delayed')?.value?.shipments),
       discrepancies: asArray(valueFor('Discrepancies')?.value?.discrepancies),
-      drivers: asArray(valueFor('Drivers')?.value),
+      drivers: driversWithPoints,
       errors: [...results, ...trackingResults]
         .filter((result) => !result.ok)
         .map((result) => `${result.label}: ${result.error.message}`),
@@ -203,17 +256,22 @@ function OperatorHero({ children, onRefresh, state, title }) {
 }
 
 function AssignmentPanel({ onAssigned, state, token }) {
-  const availableDrivers = state.drivers.filter((driver) => driver.available)
+  const availableDrivers = useMemo(
+    () => sortDriversByPoints(state.drivers.filter((driver) => driver.available)),
+    [state.drivers]
+  )
   const [form, setForm] = useState({ driverId: '', shipmentId: '' })
   const [message, setMessage] = useState('')
   const [busy, setBusy] = useState(false)
 
   useEffect(() => {
     setForm((current) => ({
-      driverId: current.driverId || availableDrivers[0]?.id || '',
+      driverId: availableDrivers.some((driver) => String(driver.id) === String(current.driverId))
+        ? current.driverId
+        : availableDrivers[0]?.id || '',
       shipmentId: current.shipmentId || state.shipments[0]?._id || '',
     }))
-  }, [state.drivers, state.shipments])
+  }, [availableDrivers, state.shipments])
 
   async function handleSubmit(event) {
     event.preventDefault()
@@ -252,7 +310,7 @@ function AssignmentPanel({ onAssigned, state, token }) {
         ) : (
           <select onChange={(event) => setForm((current) => ({ ...current, driverId: event.target.value }))} value={form.driverId}>
             {availableDrivers.map((driver) => (
-              <option key={driver.id} value={driver.id}>{driver.name}</option>
+              <option key={driver.id} value={driver.id}>{formatDriverAssignmentOption(driver)}</option>
             ))}
           </select>
         )}
@@ -269,6 +327,10 @@ function CreateShipmentForm({ onCreated, profile, state, token }) {
   const [form, setForm] = useState(initialCreateForm(profile))
   const [message, setMessage] = useState('')
   const [busy, setBusy] = useState(false)
+  const availableDrivers = useMemo(
+    () => sortDriversByPoints(state.drivers.filter((driver) => driver.available)),
+    [state.drivers]
+  )
 
   function updateField(key, value) {
     setForm((current) => ({ ...current, [key]: value }))
@@ -435,8 +497,8 @@ function CreateShipmentForm({ onCreated, profile, state, token }) {
           <span>Driver assignment</span>
           <select onChange={(event) => updateField('driverId', event.target.value)} value={form.driverId}>
             <option value="">Assign later</option>
-            {state.drivers.filter((driver) => driver.available).map((driver) => (
-              <option key={driver.id} value={driver.id}>{driver.name}</option>
+            {availableDrivers.map((driver) => (
+              <option key={driver.id} value={driver.id}>{formatDriverAssignmentOption(driver)}</option>
             ))}
           </select>
         </label>
@@ -642,9 +704,13 @@ export function OperatorCreateShipmentPage({ onNavigate, onSignOut, profile, tok
   )
 }
 
+const initialDriverForm = { email: '', name: '', password: '', phone: '' }
+
 export function OperatorDriversPage({ onNavigate, onSignOut, profile, token }) {
   const state = useOperatorData({ token })
   const [message, setMessage] = useState('')
+  const [driverForm, setDriverForm] = useState(initialDriverForm)
+  const [createBusy, setCreateBusy] = useState(false)
 
   async function toggleDriver(driver) {
     setMessage('')
@@ -657,35 +723,125 @@ export function OperatorDriversPage({ onNavigate, onSignOut, profile, token }) {
     }
   }
 
+  async function handleCreateDriver(event) {
+    event.preventDefault()
+    setMessage('')
+    setCreateBusy(true)
+    try {
+      const driver = await createDriver({ email: driverForm.email, name: driverForm.name, phone: driverForm.phone }, { token })
+      try {
+        await createUser({ email: driverForm.email, id: String(driver.id), name: driverForm.name, password: driverForm.password, role: 'driver' }, { token })
+      } catch (error) {
+        try { await deleteDriver(driver.id, { token }) } catch (_) { /* best effort rollback */ }
+        throw error
+      }
+      setMessage(`${driverForm.name} kan nu logge ind som driver.`)
+      setDriverForm(initialDriverForm)
+      state.loadOperatorData()
+    } catch (error) {
+      setMessage(error.message)
+    } finally {
+      setCreateBusy(false)
+    }
+  }
+
   return (
     <AppShell active="operator-drivers" onNavigate={onNavigate} onSignOut={onSignOut} profile={profile} token={token}>
       <OperatorHero onRefresh={state.loadOperatorData} state={state} title="Driver capacity">
         Monitor available drivers and capacity signals used when assigning shipments.
       </OperatorHero>
-      {message ? <Notice tone={message.includes('now') ? 'subtle' : 'warning'}>{message}</Notice> : null}
+      {message ? <Notice tone={message.includes('logge') ? 'subtle' : 'warning'}>{message}</Notice> : null}
       {state.loading ? <LoadingGrid count={4} /> : (
-        <section className="panel">
-          <div className="panel-heading">
-            <div>
-              <span>{state.drivers.length} records</span>
-              <h2>Drivers</h2>
+        <div className="panel-grid equal">
+          <section className="panel">
+            <div className="panel-heading">
+              <div>
+                <span>{state.drivers.length} records</span>
+                <h2>Drivers</h2>
+              </div>
             </div>
-          </div>
-          <DriverAvailabilityList drivers={state.drivers} onToggle={toggleDriver} />
-        </section>
+            <DriverAvailabilityList drivers={state.drivers} onToggle={toggleDriver} />
+          </section>
+
+          {profile?.role === 'admin' ? (
+            <section className="form-panel">
+              <div className="panel-heading">
+                <div>
+                  <span>Admin</span>
+                  <h2>Create driver</h2>
+                </div>
+              </div>
+              <form className="stacked-form" onSubmit={handleCreateDriver}>
+                <label className="field">
+                  <span>Name</span>
+                  <input onChange={(e) => setDriverForm((f) => ({ ...f, name: e.target.value }))} required value={driverForm.name} />
+                </label>
+                <label className="field">
+                  <span>Email</span>
+                  <input onChange={(e) => setDriverForm((f) => ({ ...f, email: e.target.value }))} required type="email" value={driverForm.email} />
+                </label>
+                <label className="field">
+                  <span>Phone</span>
+                  <input onChange={(e) => setDriverForm((f) => ({ ...f, phone: e.target.value }))} required type="tel" value={driverForm.phone} />
+                </label>
+                <label className="field">
+                  <span>Password</span>
+                  <input onChange={(e) => setDriverForm((f) => ({ ...f, password: e.target.value }))} required type="password" value={driverForm.password} />
+                </label>
+                <button className="button-primary" disabled={createBusy} type="submit">
+                  {createBusy ? 'Creating' : 'Create driver'}
+                </button>
+              </form>
+            </section>
+          ) : null}
+        </div>
       )}
     </AppShell>
   )
 }
 
+const initialCustomerForm = { company: '', email: '', isLogisticsManager: false, name: '', password: '', phone: '' }
+
 export function OperatorCustomersPage({ onNavigate, onSignOut, profile, token }) {
   const state = useOperatorData({ token })
+  const [message, setMessage] = useState('')
+  const [customerForm, setCustomerForm] = useState(initialCustomerForm)
+  const [createBusy, setCreateBusy] = useState(false)
+
+  async function handleCreateCustomer(event) {
+    event.preventDefault()
+    setMessage('')
+    setCreateBusy(true)
+    const role = customerForm.isLogisticsManager ? 'logistics' : 'customer'
+    try {
+      const customer = await createCustomer({
+        company: customerForm.company || null,
+        email: customerForm.email,
+        name: customerForm.name,
+        phone: customerForm.phone || null,
+      }, { token })
+      try {
+        await createUser({ customerId: customer.customerId, email: customerForm.email, id: customer.customerId, name: customerForm.name, password: customerForm.password, role }, { token })
+      } catch (error) {
+        try { await deleteCustomer(customer.customerId, { token }) } catch (_) { /* best effort rollback */ }
+        throw error
+      }
+      setMessage(`${customerForm.name} kan nu logge ind som ${customerForm.isLogisticsManager ? 'logistics manager' : 'customer'}.`)
+      setCustomerForm(initialCustomerForm)
+      state.loadOperatorData()
+    } catch (error) {
+      setMessage(error.message)
+    } finally {
+      setCreateBusy(false)
+    }
+  }
 
   return (
     <AppShell active="operator-customers" onNavigate={onNavigate} onSignOut={onSignOut} profile={profile} token={token}>
       <OperatorHero onRefresh={state.loadOperatorData} state={state} title="Customers and senders">
         Reference view for customer and sender master data connected to shipment records.
       </OperatorHero>
+      {message ? <Notice tone={message.includes('logge') ? 'subtle' : 'warning'}>{message}</Notice> : null}
       {state.loading ? <LoadingGrid count={4} /> : (
         <div className="panel-grid equal">
           <section className="panel">
@@ -707,6 +863,7 @@ export function OperatorCustomersPage({ onNavigate, onSignOut, profile, token })
             </ul>
             {state.customers.length === 0 ? <EmptyState compact message="No customer records are available." /> : null}
           </section>
+
           <section className="panel">
             <div className="panel-heading">
               <div>
@@ -726,6 +883,51 @@ export function OperatorCustomersPage({ onNavigate, onSignOut, profile, token })
             </ul>
             {state.senders.length === 0 ? <EmptyState compact message="No sender records are available." /> : null}
           </section>
+
+          {profile?.role === 'admin' ? (
+            <section className="form-panel">
+              <div className="panel-heading">
+                <div>
+                  <span>Admin</span>
+                  <h2>Create customer</h2>
+                </div>
+              </div>
+              <form className="stacked-form" onSubmit={handleCreateCustomer}>
+                <label className="field">
+                  <span>Name</span>
+                  <input onChange={(e) => setCustomerForm((f) => ({ ...f, name: e.target.value }))} required value={customerForm.name} />
+                </label>
+                <label className="field">
+                  <span>Company</span>
+                  <input onChange={(e) => setCustomerForm((f) => ({ ...f, company: e.target.value }))} value={customerForm.company} />
+                </label>
+                <label className="field">
+                  <span>Email</span>
+                  <input onChange={(e) => setCustomerForm((f) => ({ ...f, email: e.target.value }))} required type="email" value={customerForm.email} />
+                </label>
+                <label className="field">
+                  <span>Phone</span>
+                  <input onChange={(e) => setCustomerForm((f) => ({ ...f, phone: e.target.value }))} type="tel" value={customerForm.phone} />
+                </label>
+                <label className="field">
+                  <span>Password</span>
+                  <input onChange={(e) => setCustomerForm((f) => ({ ...f, password: e.target.value }))} required type="password" value={customerForm.password} />
+                </label>
+                <label className="field checkbox-field">
+                  <input
+                    checked={customerForm.isLogisticsManager}
+                    id="isLogisticsManager"
+                    onChange={(e) => setCustomerForm((f) => ({ ...f, isLogisticsManager: e.target.checked }))}
+                    type="checkbox"
+                  />
+                  <span>Logistics manager</span>
+                </label>
+                <button className="button-primary" disabled={createBusy} type="submit">
+                  {createBusy ? 'Creating' : `Create ${customerForm.isLogisticsManager ? 'logistics manager' : 'customer'}`}
+                </button>
+              </form>
+            </section>
+          ) : null}
         </div>
       )}
     </AppShell>
