@@ -1055,6 +1055,19 @@ p {
   gap: 7px;
 }
 
+.checkbox-field {
+  align-items: center;
+  display: flex;
+  flex-direction: row;
+  gap: 10px;
+}
+
+.checkbox-field input[type="checkbox"] {
+  height: 18px;
+  min-height: unset;
+  width: 18px;
+}
+
 .field span,
 .tracking-search span {
   color: var(--color-text-main);
