@@ -20,7 +20,7 @@ import {
   searchTracking,
   updateTicket,
 } from '../clients/supportClient'
-import { createTrackingEvent, getLatestTracking } from '../clients/trackingClient'
+import { getLatestTracking } from '../clients/trackingClient'
 import {
   AppShell,
   EmptyState,
@@ -33,24 +33,6 @@ import { asArray, compactId, formatDateTime, formatStatus } from '../utils/forma
 
 const SHIPMENT_STATUS_OPTIONS = ['all', 'booked', 'in_transit', 'received']
 const TICKET_STATUS_OPTIONS = ['open', 'in_progress', 'escalated', 'resolved']
-const TRACKING_MILESTONES = [
-  { value: 'shipment_order_created', label: 'Shipment order created' },
-  { value: 'transport_planned_carrier_assigned', label: 'Transport planned and carrier assigned' },
-  { value: 'pickup_scheduled', label: 'Pickup scheduled' },
-  { value: 'truck_arrived_pickup', label: 'Truck arrived at pickup' },
-  { value: 'goods_loaded_pickup_confirmed', label: 'Goods loaded and pickup confirmed' },
-  { value: 'shipment_in_transit', label: 'Shipment in transit' },
-  { value: 'departed_origin_terminal', label: 'Departed origin terminal' },
-  { value: 'in_transit_milestone', label: 'In transit milestone' },
-  { value: 'delay_logged', label: 'Delay logged' },
-  { value: 'exception_logged', label: 'Exception logged' },
-  { value: 'arrived_destination_terminal', label: 'Arrived destination terminal' },
-  { value: 'out_for_delivery', label: 'Out for delivery' },
-  { value: 'truck_arrived_delivery', label: 'Truck arrived at delivery' },
-  { value: 'goods_delivered', label: 'Goods delivered' },
-  { value: 'pod_confirmed', label: 'Proof of delivery confirmed' },
-  { value: 'shipment_completed_closed', label: 'Shipment completed and closed' },
-]
 
 const SERVICE_ROWS = [
   { label: 'Shipments', owner: 'shipmentsService', purpose: 'Orders, goods, lifecycle status' },
@@ -115,12 +97,7 @@ export function AdminLandingPage({ onNavigate, onSignOut, profile, token }) {
   const [driverAccountForm, setDriverAccountForm] = useState(initialDriverAccountForm)
   const [customerAccountForm, setCustomerAccountForm] = useState(initialCustomerAccountForm)
   const [logisticsAccountForm, setLogisticsAccountForm] = useState(initialLogisticsAccountForm)
-  const [trackingForm, setTrackingForm] = useState({
-    eventType: 'shipment_order_created',
-    notes: '',
-    shipmentId: '',
-  })
-  const [supportSearch, setSupportSearch] = useState({
+const [supportSearch, setSupportSearch] = useState({
     error: '',
     loading: false,
     mode: 'reference',
@@ -176,10 +153,6 @@ export function AdminLandingPage({ onNavigate, onSignOut, profile, token }) {
     })
 
     if (shipments.length > 0) {
-      setTrackingForm((current) => ({
-        ...current,
-        shipmentId: current.shipmentId || shipments[0]._id,
-      }))
       setTicketForm((current) => ({
         ...current,
         customerId: current.customerId || shipments[0].receiverCustomerId || '',
@@ -425,25 +398,6 @@ export function AdminLandingPage({ onNavigate, onSignOut, profile, token }) {
       () => updateDriverAvailability(driver.id, !driver.available, { token }),
       () => `${driver.name} is now ${driver.available ? 'unavailable' : 'available'}.`
     )
-  }
-
-  async function handleRecordMilestone(event) {
-    event.preventDefault()
-    if (!trackingForm.shipmentId) {
-      setAction({ busy: '', message: 'Select a shipment before recording a milestone.', tone: 'warning' })
-      return
-    }
-    const saved = await runAction(
-      'tracking',
-      () => createTrackingEvent(trackingForm.shipmentId, {
-        eventType: trackingForm.eventType,
-        idempotencyKey: `admin-${trackingForm.shipmentId}-${trackingForm.eventType}-${Date.now()}`,
-        notes: trackingForm.notes || undefined,
-        occurredAt: new Date().toISOString(),
-      }, { token }),
-      () => 'Tracking milestone recorded.'
-    )
-    if (saved) setTrackingForm((current) => ({ ...current, notes: '' }))
   }
 
   async function handleCreateTicket(event) {
@@ -859,56 +813,9 @@ export function AdminLandingPage({ onNavigate, onSignOut, profile, token }) {
         </div>
       )}
 
-      {/* Operational tools: 2x2 grid */}
+      {/* Operational tools: grid */}
       {!state.loading && (
         <div className="panel-grid equal">
-          {/* Record tracking milestone */}
-          <section className="form-panel">
-            <div className="panel-heading">
-              <div>
-                <span>Tracking service</span>
-                <h2>Record milestone</h2>
-              </div>
-            </div>
-            <form className="stacked-form" onSubmit={handleRecordMilestone}>
-              <label className="field">
-                <span>Shipment</span>
-                <select
-                  onChange={(event) => setTrackingForm((current) => ({ ...current, shipmentId: event.target.value }))}
-                  value={trackingForm.shipmentId}
-                >
-                  {state.shipments.map((s) => (
-                    <option key={s._id} value={s._id}>
-                      {shipmentLabel(s._id)} / {formatStatus(s.status)}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="field">
-                <span>Milestone</span>
-                <select
-                  onChange={(event) => setTrackingForm((current) => ({ ...current, eventType: event.target.value }))}
-                  value={trackingForm.eventType}
-                >
-                  {TRACKING_MILESTONES.map((m) => (
-                    <option key={m.value} value={m.value}>{m.label}</option>
-                  ))}
-                </select>
-              </label>
-              <label className="field">
-                <span>Notes</span>
-                <textarea
-                  onChange={(event) => setTrackingForm((current) => ({ ...current, notes: event.target.value }))}
-                  placeholder="Operational note for this event"
-                  value={trackingForm.notes}
-                />
-              </label>
-              <button className="button-primary" disabled={action.busy === 'tracking'} type="submit">
-                {action.busy === 'tracking' ? 'Recording' : 'Record milestone'}
-              </button>
-            </form>
-          </section>
-
           {/* Create support escalation */}
           <section className="form-panel">
             <div className="panel-heading">
