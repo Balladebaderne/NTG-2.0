@@ -61,9 +61,6 @@ All app and API traffic enters through Traefik on **port 80**. Routes are define
 | `/chat` | `ai-chat-service` |
 | `/conversations` | `ai-chat-service` |
 
-**App**: http://localhost  
-**Traefik dashboard**: http://localhost:9090 (dev only — do not expose in production)
-
 ## Message broker (RabbitMQ)
 
 Services communicate asynchronously via RabbitMQ on the `ntg_broker` network.
@@ -71,8 +68,6 @@ Services communicate asynchronously via RabbitMQ on the `ntg_broker` network.
 | Exchange | Type | Publishers | Consumers |
 |----------|------|------------|-----------|
 | `tracking.events` | topic | `tracking-service` | `route-service`, `driver-loyalty-service` |
-
-**RabbitMQ management UI**: http://localhost:15672 (dev only — credentials: `guest` / `guest`)
 
 ## Run locally
 
